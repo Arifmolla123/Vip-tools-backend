@@ -918,20 +918,15 @@ def stop_bomb():
     else:
         return jsonify({"status": "not_found", "phone": phone}), 404
 
-# ========== HTML টেমপ্লেট ==========
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>💀 Hard Cyber Bomber</title>
+    <title>Hard Cyber Bomber</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             min-height: 100vh;
             display: flex;
@@ -943,7 +938,6 @@ def stop_bomb():
             position: relative;
             overflow-x: hidden;
         }
-        /* অ্যানিমেটেড ব্যাকগ্রাউন্ড */
         body::before {
             content: '';
             position: fixed;
@@ -966,8 +960,6 @@ def stop_bomb():
             0% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(30px, -30px) scale(1.2); }
         }
-
-        /* কার্ড */
         .card {
             position: relative;
             z-index: 2;
@@ -982,11 +974,7 @@ def stop_bomb():
             box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
             transition: transform 0.3s ease;
         }
-        .card:hover {
-            transform: translateY(-2px);
-        }
-
-        /* হেডার */
+        .card:hover { transform: translateY(-2px); }
         .logo {
             font-family: 'Orbitron', monospace;
             font-size: 28px;
@@ -1019,11 +1007,7 @@ def stop_bomb():
             background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
             margin: 18px 0 24px 0;
         }
-
-        /* ফর্ম গ্রুপ */
-        .form-group {
-            margin-bottom: 16px;
-        }
+        .form-group { margin-bottom: 16px; }
         .form-group label {
             display: block;
             font-size: 13px;
@@ -1051,20 +1035,9 @@ def stop_bomb():
             box-shadow: 0 0 30px rgba(0, 240, 255, 0.08), inset 0 0 20px rgba(0, 240, 255, 0.03);
             background: rgba(0, 0, 0, 0.7);
         }
-        .input-field::placeholder {
-            color: #3d4a66;
-        }
-
-        /* ডাবল ইনপুট সারি */
-        .row {
-            display: flex;
-            gap: 12px;
-        }
-        .row .form-group {
-            flex: 1;
-        }
-
-        /* বাটন */
+        .input-field::placeholder { color: #3d4a66; }
+        .row { display: flex; gap: 12px; }
+        .row .form-group { flex: 1; }
         .btn {
             width: 100%;
             padding: 16px 20px;
@@ -1089,12 +1062,8 @@ def stop_bomb():
             opacity: 0;
             transition: 0.4s;
         }
-        .btn:hover::after {
-            opacity: 1;
-        }
-        .btn:active {
-            transform: scale(0.96);
-        }
+        .btn:hover::after { opacity: 1; }
+        .btn:active { transform: scale(0.96); }
         .btn-fire {
             background: linear-gradient(135deg, #ff0040, #ff6b00);
             color: #fff;
@@ -1116,16 +1085,8 @@ def stop_bomb():
             transform: translateY(-3px);
             box-shadow: 0 8px 30px rgba(255, 50, 50, 0.2);
         }
-
-        .flex {
-            display: flex;
-            gap: 12px;
-        }
-        .flex .btn {
-            flex: 1;
-        }
-
-        /* রেজাল্ট বক্স */
+        .flex { display: flex; gap: 12px; }
+        .flex .btn { flex: 1; }
         .result-box {
             margin-top: 22px;
             padding: 16px 20px;
@@ -1145,8 +1106,6 @@ def stop_bomb():
             border-color: rgba(255, 0, 0, 0.12);
             color: #ff7a7a;
         }
-
-        /* ফুটার */
         .footer {
             margin-top: 24px;
             text-align: center;
@@ -1161,31 +1120,13 @@ def stop_bomb():
             font-size: 14px;
             text-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
         }
-        .footer .credit span {
-            color: #ff6b00;
-        }
-
-        /* রেস্পন্সিভ */
+        .footer .credit span { color: #ff6b00; }
         @media (max-width: 480px) {
-            .card {
-                padding: 24px 16px 20px;
-                border-radius: 28px;
-            }
-            .logo {
-                font-size: 22px;
-            }
-            .row {
-                flex-direction: column;
-                gap: 0;
-            }
-            .btn {
-                font-size: 13px;
-                padding: 14px 16px;
-            }
-            .input-field {
-                font-size: 15px;
-                padding: 12px 16px;
-            }
+            .card { padding: 24px 16px 20px; border-radius: 28px; }
+            .logo { font-size: 22px; }
+            .row { flex-direction: column; gap: 0; }
+            .btn { font-size: 13px; padding: 14px 16px; }
+            .input-field { font-size: 15px; padding: 12px 16px; }
         }
     </style>
 </head>
@@ -1195,28 +1136,28 @@ def stop_bomb():
     <div class="orb orb3"></div>
 
     <div class="card">
-        <div class="logo">💀 Hard Cyber Bomber</div>
-        <div class="subtitle">⚡ Continuous OTP · Call · WhatsApp</div>
+        <div class="logo">Hard Cyber Bomber</div>
+        <div class="subtitle">Continuous OTP · Call · WhatsApp</div>
         <div class="divider"></div>
 
         <form method="POST" id="bombForm">
             <div class="form-group">
-                <label>📞 Target Phone</label>
+                <label>Target Phone</label>
                 <input type="text" id="phoneInput" name="phone" class="input-field" placeholder="Enter 10-digit number" required>
             </div>
 
             <div class="row">
                 <div class="form-group">
-                    <label>⏱️ Delay (sec)</label>
+                    <label>Delay (sec)</label>
                     <input type="number" name="delay" class="input-field" value="2" step="0.5" min="0.5">
                 </div>
                 <div class="form-group" style="display: flex; align-items: flex-end;">
-                    <button type="submit" class="btn btn-fire">▶ Start</button>
+                    <button type="submit" class="btn btn-fire">Start</button>
                 </div>
             </div>
 
             <div class="flex" style="margin-top: 6px;">
-                <button type="button" class="btn btn-stop" onclick="stopBomb()">⏹ Stop</button>
+                <button type="button" class="btn btn-stop" onclick="stopBomb()">Stop</button>
             </div>
         </form>
 
@@ -1227,7 +1168,7 @@ def stop_bomb():
         {% endif %}
 
         <div class="footer">
-            <div class="credit">🔰 Developed by <span>Arif</span></div>
+            <div class="credit">Developed by <span>Arif</span></div>
         </div>
     </div>
 
@@ -1252,18 +1193,17 @@ def stop_bomb():
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'stopped') {
-                    alert('✅ Bombing stopped for ' + data.phone);
+                    alert('Bombing stopped for ' + data.phone);
                     location.reload();
                 } else {
-                    alert('⚠️ No active bombing found for this number.');
+                    alert('No active bombing found for this number.');
                 }
             })
             .catch(err => {
-                alert('❌ Error: ' + err.message);
+                alert('Error: ' + err.message);
             });
         }
 
-        // ফর্ম সাবমিটের আগে যদি ইনপুট খালি থাকে, থামানো
         document.getElementById('bombForm').addEventListener('submit', function(e) {
             const phone = document.getElementById('phoneInput').value.trim();
             if (!phone) {
