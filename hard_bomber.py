@@ -919,68 +919,359 @@ def stop_bomb():
         return jsonify({"status": "not_found", "phone": phone}), 404
 
 # ========== HTML টেমপ্লেট ==========
-HTML_FORM = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>💀 Hard Cyber Bomber</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* তোমার hard_bomber (1).py-এর CSS এখানে কপি করো – আমি সংক্ষেপ করছি */
-        body { background: #0a0e17; color: #fff; font-family: 'Rajdhani', sans-serif; }
-        .card { max-width: 560px; margin: 0 auto; padding: 30px; background: rgba(10,14,23,0.85); border-radius: 32px; }
-        .logo { font-size: 32px; font-weight: 900; background: linear-gradient(135deg, #ff0040, #ff6b00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .subtitle { color: #00f0ff; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(0,255,255,0.2); background: rgba(0,0,0,0.4); color: #fff; }
-        .btn-fire { background: linear-gradient(135deg, #ff0040, #ff6b00); border: none; cursor: pointer; }
-        .btn-stop { background: #ff3333; border: none; cursor: pointer; }
-        .result-box { margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(0,255,0,0.05); color: #90ff90; }
-        .result-box.error { background: rgba(255,0,0,0.05); color: #ff7a7a; }
-        .flex { display: flex; gap: 10px; }
-        .flex input { flex: 2; }
-        .flex button { flex: 1; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0a0e17;
+            font-family: 'Rajdhani', sans-serif;
+            padding: 16px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        /* অ্যানিমেটেড ব্যাকগ্রাউন্ড */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 20% 30%, #1a0a1a, #0a0e17 70%);
+            z-index: -2;
+        }
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.35;
+            z-index: -1;
+            animation: orbFloat 12s ease-in-out infinite alternate;
+        }
+        .orb1 { width: 300px; height: 300px; background: #ff0040; top: -100px; left: -100px; }
+        .orb2 { width: 350px; height: 350px; background: #00f0ff; bottom: -120px; right: -120px; animation-delay: 4s; }
+        .orb3 { width: 200px; height: 200px; background: #7a00ff; top: 40%; left: 50%; transform: translateX(-50%); animation-delay: 8s; }
+        @keyframes orbFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, -30px) scale(1.2); }
+        }
+
+        /* কার্ড */
+        .card {
+            position: relative;
+            z-index: 2;
+            max-width: 480px;
+            width: 100%;
+            background: rgba(10, 14, 23, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 40px;
+            padding: 32px 24px 28px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        /* হেডার */
+        .logo {
+            font-family: 'Orbitron', monospace;
+            font-size: 28px;
+            font-weight: 900;
+            text-align: center;
+            background: linear-gradient(135deg, #ff0040, #ff6b00, #ff0040);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s ease-in-out infinite;
+            letter-spacing: 1px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .subtitle {
+            text-align: center;
+            color: #00f0ff;
+            font-size: 14px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-top: 4px;
+            font-weight: 600;
+            text-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+        }
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            margin: 18px 0 24px 0;
+        }
+
+        /* ফর্ম গ্রুপ */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #8899bb;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .input-field {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-size: 16px;
+            font-family: 'Rajdhani', sans-serif;
+            transition: 0.3s;
+            outline: none;
+            backdrop-filter: blur(4px);
+        }
+        .input-field:focus {
+            border-color: #00f0ff;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.08), inset 0 0 20px rgba(0, 240, 255, 0.03);
+            background: rgba(0, 0, 0, 0.7);
+        }
+        .input-field::placeholder {
+            color: #3d4a66;
+        }
+
+        /* ডাবল ইনপুট সারি */
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+        .row .form-group {
+            flex: 1;
+        }
+
+        /* বাটন */
+        .btn {
+            width: 100%;
+            padding: 16px 20px;
+            border: none;
+            border-radius: 60px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%);
+            opacity: 0;
+            transition: 0.4s;
+        }
+        .btn:hover::after {
+            opacity: 1;
+        }
+        .btn:active {
+            transform: scale(0.96);
+        }
+        .btn-fire {
+            background: linear-gradient(135deg, #ff0040, #ff6b00);
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(255, 0, 64, 0.3);
+        }
+        .btn-fire:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(255, 0, 64, 0.5);
+        }
+        .btn-stop {
+            background: rgba(255, 50, 50, 0.15);
+            color: #ff6a6a;
+            border: 1px solid rgba(255, 50, 50, 0.3);
+            backdrop-filter: blur(4px);
+        }
+        .btn-stop:hover {
+            background: rgba(255, 50, 50, 0.25);
+            border-color: #ff6a6a;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(255, 50, 50, 0.2);
+        }
+
+        .flex {
+            display: flex;
+            gap: 12px;
+        }
+        .flex .btn {
+            flex: 1;
+        }
+
+        /* রেজাল্ট বক্স */
+        .result-box {
+            margin-top: 22px;
+            padding: 16px 20px;
+            border-radius: 20px;
+            background: rgba(0, 255, 0, 0.04);
+            border: 1px solid rgba(0, 255, 0, 0.08);
+            color: #90ff90;
+            text-align: center;
+            font-weight: 600;
+            font-size: 15px;
+            word-break: break-word;
+            backdrop-filter: blur(4px);
+            transition: 0.3s;
+        }
+        .result-box.error {
+            background: rgba(255, 0, 0, 0.06);
+            border-color: rgba(255, 0, 0, 0.12);
+            color: #ff7a7a;
+        }
+
+        /* ফুটার */
+        .footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 13px;
+            color: #3d4a66;
+            border-top: 1px solid rgba(255,255,255,0.03);
+            padding-top: 18px;
+        }
+        .footer .credit {
+            color: #00f0ff;
+            font-weight: 700;
+            font-size: 14px;
+            text-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+        }
+        .footer .credit span {
+            color: #ff6b00;
+        }
+
+        /* রেস্পন্সিভ */
+        @media (max-width: 480px) {
+            .card {
+                padding: 24px 16px 20px;
+                border-radius: 28px;
+            }
+            .logo {
+                font-size: 22px;
+            }
+            .row {
+                flex-direction: column;
+                gap: 0;
+            }
+            .btn {
+                font-size: 13px;
+                padding: 14px 16px;
+            }
+            .input-field {
+                font-size: 15px;
+                padding: 12px 16px;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="card">
-    <div class="logo">💀 Hard Cyber Bomber</div>
-    <div class="subtitle">⚡ Continuous OTP · Call · WhatsApp</div>
-    <form method="POST" id="bombForm">
-        <input type="text" name="phone" placeholder="Enter 10-digit number" required>
-        <input type="number" name="delay" value="2" step="0.5" min="0.5" placeholder="Delay (sec)">
-        <div class="flex">
-            <button type="submit" class="btn-fire">▶ Start Bombing</button>
-            <button type="button" class="btn-stop" onclick="stopBomb()">⏹ Stop</button>
-        </div>
-    </form>
-    {% if result %}
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+
+    <div class="card">
+        <div class="logo">💀 Hard Cyber Bomber</div>
+        <div class="subtitle">⚡ Continuous OTP · Call · WhatsApp</div>
+        <div class="divider"></div>
+
+        <form method="POST" id="bombForm">
+            <div class="form-group">
+                <label>📞 Target Phone</label>
+                <input type="text" id="phoneInput" name="phone" class="input-field" placeholder="Enter 10-digit number" required>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>⏱️ Delay (sec)</label>
+                    <input type="number" name="delay" class="input-field" value="2" step="0.5" min="0.5">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                    <button type="submit" class="btn btn-fire">▶ Start</button>
+                </div>
+            </div>
+
+            <div class="flex" style="margin-top: 6px;">
+                <button type="button" class="btn btn-stop" onclick="stopBomb()">⏹ Stop</button>
+            </div>
+        </form>
+
+        {% if result %}
         <div class="result-box {% if '❌' in result or '⚠️' in result %}error{% endif %}">
             {{ result }}
         </div>
-    {% endif %}
-    <div style="margin-top:20px; font-size:12px; color:#3d4a66;">🔰 Developed by Arif</div>
-</div>
-<script>
-    function stopBomb() {
-        const phone = document.querySelector('input[name="phone"]').value;
-        if (!phone) { alert('Enter phone number first'); return; }
-        fetch('/hard_bomber/stop', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'phone=' + encodeURIComponent(phone)
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'stopped') {
-                alert('✅ Bombing stopped for ' + data.phone);
-                location.reload();
-            } else {
-                alert('⚠️ No active bombing for this number.');
+        {% endif %}
+
+        <div class="footer">
+            <div class="credit">🔰 Developed by <span>Arif</span></div>
+        </div>
+    </div>
+
+    <script>
+        function stopBomb() {
+            const phoneInput = document.getElementById('phoneInput');
+            if (!phoneInput) {
+                alert('Phone input not found!');
+                return;
+            }
+            const phone = phoneInput.value.trim();
+            if (!phone) {
+                alert('Please enter a phone number first.');
+                return;
+            }
+
+            fetch('/hard_bomber/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'phone=' + encodeURIComponent(phone)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'stopped') {
+                    alert('✅ Bombing stopped for ' + data.phone);
+                    location.reload();
+                } else {
+                    alert('⚠️ No active bombing found for this number.');
+                }
+            })
+            .catch(err => {
+                alert('❌ Error: ' + err.message);
+            });
+        }
+
+        // ফর্ম সাবমিটের আগে যদি ইনপুট খালি থাকে, থামানো
+        document.getElementById('bombForm').addEventListener('submit', function(e) {
+            const phone = document.getElementById('phoneInput').value.trim();
+            if (!phone) {
+                e.preventDefault();
+                alert('Please enter a 10-digit phone number.');
             }
         });
-    }
-</script>
+    </script>
 </body>
 </html>
 """
