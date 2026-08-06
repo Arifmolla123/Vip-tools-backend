@@ -11,7 +11,7 @@ for file in files:
 
 @app.route('/')
 def home():
-    return {'status': 'online', 'tools': ['/bomber', '/phis', '/spy']}
+    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy']}
 
 @app.route('/ping')
 def ping():
