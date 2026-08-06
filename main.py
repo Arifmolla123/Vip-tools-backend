@@ -3,7 +3,7 @@ import importlib
 
 app = Flask(__name__)
 
-files = ['cyber_bomber', 'cyber_phis', 'cyber_spy']
+files = ['hard_bomber', 'cyber_phis', 'cyber_spy']
 for file in files:
     module = importlib.import_module(file)
     if hasattr(module, 'bp'):
