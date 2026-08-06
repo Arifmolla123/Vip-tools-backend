@@ -1173,11 +1173,9 @@ HTML_FORM = """
             </div>
         </form>
 
-        {% if result %}
-        <div class="result-box {% if '❌' in result or '⚠️' in result %}error{% endif %}">
-            {{ result }}
+        <div id="resultBox" class="result-box {% if result and ('❌' in result or '⚠️' in result) %}error{% endif %}" style="display: {% if result %}block{% else %}none{% endif %};">
+            {{ result if result else '' }}
         </div>
-        {% endif %}
 
         <div class="footer">
             <div class="credit">Developed by <span>Arif</span></div>
@@ -1188,8 +1186,17 @@ HTML_FORM = """
         const phoneInput = document.getElementById('phoneInput');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const resultBox = document.getElementById('resultBox');
 
-        // স্টার্ট বাটনে ক্লিক করলে ইনপুট ডিজেবল করো
+        // পেজ লোড হলে যদি রেজাল্টে "started" থাকে, ইনপুট ডিজেবল করো
+        window.addEventListener('load', function() {
+            if (resultBox.textContent.includes('started')) {
+                phoneInput.disabled = true;
+                startBtn.disabled = true;
+            }
+        });
+
+        // ফর্ম সাবমিট (Start)
         document.getElementById('bombForm').addEventListener('submit', function(e) {
             const phone = phoneInput.value.trim();
             if (!phone) {
@@ -1197,14 +1204,14 @@ HTML_FORM = """
                 alert('Please enter a 10-digit phone number.');
                 return;
             }
-            // ফর্ম সাবমিট হওয়ার পর ইনপুট ডিজেবল করো (একটু delay দিয়ে)
+            // ফর্ম সাবমিটের পর ইনপুট ডিজেবল করব (আমরা setTimeout দিয়ে দিই)
             setTimeout(() => {
                 phoneInput.disabled = true;
                 startBtn.disabled = true;
             }, 100);
         });
 
-        // স্টপ বাটন – ফোন নম্বর ফিল্ড থেকে ভ্যালু নিয়ে থামাও
+        // Stop বাটন
         stopBtn.addEventListener('click', function() {
             const phone = phoneInput.value.trim();
             if (!phone) {
@@ -1220,11 +1227,14 @@ HTML_FORM = """
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'stopped') {
-                    alert('Stopped for ' + data.phone);
-                    // ইনপুট আবার এনাবল করো
+                    // ইনপুট ও বাটন আবার এনাবল করো
                     phoneInput.disabled = false;
                     startBtn.disabled = false;
-                    location.reload();
+                    // রেজাল্ট আপডেট করো
+                    resultBox.textContent = 'Stopped for ' + data.phone;
+                    resultBox.className = 'result-box';
+                    resultBox.style.display = 'block';
+                    alert('Stopped for ' + data.phone);
                 } else {
                     alert('No active bombing found for this number.');
                 }
@@ -1232,15 +1242,6 @@ HTML_FORM = """
             .catch(err => {
                 alert('Error: ' + err.message);
             });
-        });
-
-        // পেজ রিলোড হলে যদি রেজাল্টে "started" থাকে, তাহলে ইনপুট ডিজেবল রেখো
-        window.addEventListener('load', function() {
-            const resultBox = document.querySelector('.result-box');
-            if (resultBox && resultBox.textContent.includes('started')) {
-                phoneInput.disabled = true;
-                startBtn.disabled = true;
-            }
         });
     </script>
 </body>
