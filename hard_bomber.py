@@ -1037,6 +1037,11 @@ HTML_FORM = """
             background: rgba(0, 0, 0, 0.7);
         }
         .input-field::placeholder { color: #3d4a66; }
+        .input-field:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            border-color: rgba(255,255,255,0.05);
+        }
         .row { display: flex; gap: 12px; }
         .row .form-group { flex: 1; }
         .btn {
@@ -1073,6 +1078,12 @@ HTML_FORM = """
         .btn-fire:hover {
             transform: translateY(-3px);
             box-shadow: 0 12px 40px rgba(255, 0, 64, 0.5);
+        }
+        .btn-fire:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
         }
         .btn-stop {
             background: rgba(255, 50, 50, 0.15);
@@ -1153,12 +1164,12 @@ HTML_FORM = """
                     <input type="number" name="delay" class="input-field" value="2" step="0.5" min="0.5">
                 </div>
                 <div class="form-group" style="display: flex; align-items: flex-end;">
-                    <button type="submit" class="btn btn-fire">Start</button>
+                    <button type="submit" id="startBtn" class="btn btn-fire">Start</button>
                 </div>
             </div>
 
             <div class="flex" style="margin-top: 6px;">
-                <button type="button" class="btn btn-stop" onclick="stopBomb()">Stop</button>
+                <button type="button" id="stopBtn" class="btn btn-stop">Stop</button>
             </div>
         </form>
 
@@ -1174,15 +1185,30 @@ HTML_FORM = """
     </div>
 
     <script>
-        function stopBomb() {
-            const phoneInput = document.getElementById('phoneInput');
-            if (!phoneInput) {
-                alert('Phone input not found!');
-                return;
-            }
+        const phoneInput = document.getElementById('phoneInput');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+        // স্টার্ট বাটনে ক্লিক করলে ইনপুট ডিজেবল করো
+        document.getElementById('bombForm').addEventListener('submit', function(e) {
             const phone = phoneInput.value.trim();
             if (!phone) {
-                alert('Please enter a phone number first.');
+                e.preventDefault();
+                alert('Please enter a 10-digit phone number.');
+                return;
+            }
+            // ফর্ম সাবমিট হওয়ার পর ইনপুট ডিজেবল করো (একটু delay দিয়ে)
+            setTimeout(() => {
+                phoneInput.disabled = true;
+                startBtn.disabled = true;
+            }, 100);
+        });
+
+        // স্টপ বাটন – ফোন নম্বর ফিল্ড থেকে ভ্যালু নিয়ে থামাও
+        stopBtn.addEventListener('click', function() {
+            const phone = phoneInput.value.trim();
+            if (!phone) {
+                alert('No phone number found. Start bombing first.');
                 return;
             }
 
@@ -1195,6 +1221,9 @@ HTML_FORM = """
             .then(data => {
                 if (data.status === 'stopped') {
                     alert('Stopped for ' + data.phone);
+                    // ইনপুট আবার এনাবল করো
+                    phoneInput.disabled = false;
+                    startBtn.disabled = false;
                     location.reload();
                 } else {
                     alert('No active bombing found for this number.');
@@ -1203,12 +1232,14 @@ HTML_FORM = """
             .catch(err => {
                 alert('Error: ' + err.message);
             });
-        }
+        });
 
-        document.getElementById('bombForm').addEventListener('submit', function(e) {
-            if (!document.getElementById('phoneInput').value.trim()) {
-                e.preventDefault();
-                alert('Please enter a 10-digit phone number.');
+        // পেজ রিলোড হলে যদি রেজাল্টে "started" থাকে, তাহলে ইনপুট ডিজেবল রেখো
+        window.addEventListener('load', function() {
+            const resultBox = document.querySelector('.result-box');
+            if (resultBox && resultBox.textContent.includes('started')) {
+                phoneInput.disabled = true;
+                startBtn.disabled = true;
             }
         });
     </script>
