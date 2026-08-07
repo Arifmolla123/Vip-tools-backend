@@ -11,8 +11,8 @@
         color: #e0e0e0;
         overflow-x: hidden;
         position: relative;
+        padding: 20px;
     }
-    /* অ্যানিমেটেড ব্যাকগ্রাউন্ড */
     body::before {
         content: '';
         position: fixed;
@@ -29,9 +29,8 @@
         z-index: -1;
     }
 
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
 
-    /* গ্লাস কার্ড */
     .glass-card {
         background: rgba(10, 18, 34, 0.65);
         backdrop-filter: blur(20px);
@@ -55,7 +54,6 @@
         pointer-events: none;
     }
 
-    /* লোগো & ব্র্যান্ড */
     .brand {
         font-size: 2.2rem;
         font-weight: 800;
@@ -87,7 +85,6 @@
         border: 1px solid rgba(255,255,255,0.06);
     }
 
-    /* লগআউট */
     .logout {
         text-align: right;
         margin-bottom: 16px;
@@ -113,7 +110,6 @@
         transform: translateY(-2px);
     }
 
-    /* হেডার */
     .dashboard-header {
         display: flex;
         justify-content: space-between;
@@ -148,7 +144,6 @@
         color: #8ae6e6;
     }
 
-    /* নিউ লিংক বাটন */
     .btn-new {
         display: inline-flex;
         align-items: center;
@@ -170,11 +165,7 @@
         box-shadow: 0 12px 35px rgba(0, 100, 255, 0.4);
         background: linear-gradient(135deg, #00ddff, #0080ff);
     }
-    .btn-new i {
-        font-size: 1.2rem;
-    }
 
-    /* সেকশন টাইটেল */
     .section-title {
         display: flex;
         align-items: center;
@@ -191,7 +182,6 @@
         text-shadow: 0 0 15px #00ffff;
     }
 
-    /* লিংক কার্ড */
     .link-card {
         background: rgba(0, 0, 0, 0.35);
         border-radius: 28px;
@@ -222,21 +212,46 @@
         margin-right: 12px;
         box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
     }
-    .link-card .link-url {
+
+    /* লিংক ইউআরএল + কপি/প্রিভিউ */
+    .link-url {
         font-family: 'Courier New', monospace;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         color: #8ae6e6;
         background: rgba(0,0,0,0.3);
         padding: 6px 14px;
         border-radius: 30px;
-        display: inline-block;
-        word-break: break-all;
         border: 1px solid rgba(0, 255, 255, 0.06);
-        margin: 6px 0 12px 0;
-        width: 100%;
-        max-width: 100%;
+        word-break: break-all;
         overflow-x: auto;
+        white-space: nowrap;
     }
+    .btn-copy, .btn-preview {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 14px;
+        border-radius: 40px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        background: rgba(0, 255, 255, 0.04);
+        color: #8ae6e6;
+        cursor: pointer;
+        transition: 0.25s ease;
+        text-decoration: none;
+        font-family: inherit;
+    }
+    .btn-copy:hover, .btn-preview:hover {
+        background: rgba(0, 255, 255, 0.12);
+        border-color: rgba(0, 255, 255, 0.3);
+        color: #b0fff0;
+        transform: translateY(-2px);
+    }
+    .btn-copy:active {
+        transform: scale(0.95);
+    }
+
     .link-card .link-meta {
         display: flex;
         justify-content: space-between;
@@ -285,7 +300,6 @@
         color: #ff8a8a;
     }
 
-    /* খালি স্টেট */
     .empty-state {
         text-align: center;
         padding: 40px 20px;
@@ -303,14 +317,39 @@
         font-weight: 400;
     }
 
-    /* রেস্পন্সিভ */
+    /* টোস্ট */
+    .copy-toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%) translateY(80px);
+        background: rgba(0, 255, 200, 0.12);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 255, 200, 0.2);
+        color: #b0fff0;
+        padding: 12px 28px;
+        border-radius: 60px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 999;
+        pointer-events: none;
+    }
+    .copy-toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
     @media (max-width: 768px) {
         .glass-card { padding: 20px; }
         .brand { font-size: 1.6rem; }
         .dashboard-header h2 { font-size: 1.2rem; }
         .btn-new { padding: 10px 20px; font-size: 0.9rem; }
         .link-card { padding: 16px 18px; }
-        .link-card .link-url { font-size: 0.75rem; }
+        .link-url { font-size: 0.7rem; padding: 4px 10px; }
+        .btn-copy, .btn-preview { font-size: 0.65rem; padding: 4px 10px; }
         .link-card .link-meta { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 480px) {
@@ -318,6 +357,7 @@
         .brand i { font-size: 1.8rem; }
         .dashboard-header { flex-direction: column; align-items: stretch; gap: 12px; }
         .btn-new { justify-content: center; }
+        .link-url { white-space: normal; }
     }
 </style>
 </head>
@@ -325,30 +365,25 @@
 <div class="container">
     <div class="glass-card">
 
-        <!-- লগআউট -->
         <div class="logout">
             <a href="/phis/logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
 
-        <!-- ব্র্যান্ড -->
         <div class="brand">
             <i class="fas fa-shield-halved"></i>
             CYBER PHISH
             <small>v2.0</small>
         </div>
 
-        <!-- ড্যাশবোর্ড হেডার -->
         <div class="dashboard-header">
             <h2><i class="fas fa-user-astronaut"></i> Dashboard, {{ user }}</h2>
             <div class="user-tag"><i class="fas fa-circle" style="color:#00ffaa; font-size:0.6rem;"></i> Active</div>
         </div>
 
-        <!-- নিউ লিংক বাটন (হেডারের নিচে) -->
         <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
             <a href="/phis/create_link" class="btn-new"><i class="fas fa-plus-circle"></i> New Link</a>
         </div>
 
-        <!-- লিংক তালিকা -->
         <div class="section-title">
             <i class="fas fa-link"></i> Your Phishing Links
         </div>
@@ -359,7 +394,22 @@
                 <span class="badge">{{ link.template.upper() }}</span>
                 <span style="font-size:0.7rem; color:#5a7a8a;"><i class="far fa-clock"></i> {{ link.created_at }}</span>
             </div>
-            <div class="link-url">{{ host_url }}/phis/f/{{ link.link_id }}</div>
+
+            <!-- লিংক + কপি/প্রিভিউ -->
+            <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0 12px 0; flex-wrap: wrap;">
+                <code class="link-url" style="flex:1; min-width:150px;">
+                    {{ host_url }}/phis/f/{{ link.link_id }}
+                </code>
+                <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                    <button class="btn-copy" data-link="{{ host_url }}/phis/f/{{ link.link_id }}" onclick="copyLink(this)">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <a href="{{ host_url }}/phis/f/{{ link.link_id }}" target="_blank" class="btn-preview">
+                        <i class="fas fa-external-link-alt"></i> Preview
+                    </a>
+                </div>
+            </div>
+
             <div class="link-meta">
                 <small><i class="fas fa-fingerprint"></i> ID: {{ link.link_id }}</small>
                 <div class="link-actions">
@@ -377,5 +427,39 @@
 
     </div>
 </div>
+
+<script>
+    function copyLink(btn) {
+        const link = btn.getAttribute('data-link');
+        if (!link) return;
+
+        navigator.clipboard.writeText(link).then(() => {
+            showToast('✅ Link copied to clipboard!');
+        }).catch(() => {
+            const input = document.createElement('input');
+            input.value = link;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            input.remove();
+            showToast('✅ Link copied!');
+        });
+    }
+
+    function showToast(msg) {
+        let toast = document.querySelector('.copy-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'copy-toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2500);
+    }
+</script>
 </body>
    </html>
