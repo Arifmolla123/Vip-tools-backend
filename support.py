@@ -1,3 +1,14 @@
+from flask import Blueprint, render_template_string, request, jsonify
+import requests
+import json
+import time
+
+bp = Blueprint('support', __name__, url_prefix='/support')
+
+# ===================================================================
+# HTML টেমপ্লেট (support.html-এর সম্পূর্ণ কোড)
+# ===================================================================
+SUPPORT_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +17,6 @@
     <title>Cyber Tools Support</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        /* ===== আপনার দেওয়া CSS – অপরিবর্তিত ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #070d17; color: #e0f0ec; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 12px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
         .app { max-width: 860px; width: 100%; background: linear-gradient(145deg, #0f1a26, #091018); border-radius: 32px; padding: 20px; border: 1px solid #1e3347; box-shadow: 0 20px 60px rgba(0,0,0,0.8), inset 0 1px 0 #2a4a5a; display: flex; flex-direction: column; height: 95vh; max-height: 820px; }
@@ -88,23 +98,16 @@
     (function() {
         "use strict";
 
-        // ===== DOM =====
         const chatWindow = document.getElementById('chatWindow');
         const userInput = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
         const clearBtn = document.getElementById('clearBtn');
         const langLabel = document.getElementById('langLabel');
 
-        // ===== API (HTTPS) – GitHub Pages-এর জন্য নিরাপদ =====
-        const API_BASE = 'https://de3.bot-hosting.net:21007/kilwa-claude';
+        // ===== ব্যাকেন্ড এন্ডপয়েন্ট (আমাদের Flask সার্ভার) =====
+        const API_URL = '/support/chat';
 
-        // ===== প্রোক্সি (HTTPS) =====
-        const PROXIES = [
-            'https://corsproxy.io/?',
-            'https://api.allorigins.win/raw?url='
-        ];
-
-        // ===== ডকুমেন্টেশন (আপনার অ্যাপের তথ্য) =====
+        // ===== ডকুমেন্টেশন =====
         const DOCUMENTATION = `
 === CYBER TOOLS APP – COMPLETE GUIDE ===
 
@@ -150,16 +153,14 @@
 • There is NO support team. Only the developer Arif handles everything.
         `;
 
-        // ===== স্টেট =====
         let isTyping = false;
 
-        // ===== ভাষা ডিটেক্ট (হিংলিশ সহ) =====
         function detectLanguage(text) {
-            if (/[\u0980-\u09FF]/.test(text)) return 'বাংলা';
-            if (/[\u0900-\u097F]/.test(text)) return 'हिन्दी';
-            if (/[\u0600-\u06FF]/.test(text)) return 'العربية/اردو';
+            if (/[\\u0980-\\u09FF]/.test(text)) return 'বাংলা';
+            if (/[\\u0900-\\u097F]/.test(text)) return 'हिन्दी';
+            if (/[\\u0600-\\u06FF]/.test(text)) return 'العربية/اردو';
             const hinglishWords = ['kya', 'hai', 'nahi', 'aap', 'hum', 'tum', 'main', 'kaise', 'kyon', 'ho', 'hain', 'tha', 'thi', 'the', 'raha', 'rahi', 'rahe', 'sakta', 'sakti', 'sakte', 'chahiye', 'mil', 'de', 'le', 'kar', 'ko', 'se', 'mein', 'pe', 'ki', 'ka', 'ke', 'ne', 'bhi', 'hi', 'to', 'nahi', 'haan', 'ji', 'sir', 'madam', 'apka', 'apko', 'mera', 'tera', 'uska', 'unki', 'inke', 'jiska', 'jiski'];
-            const words = text.toLowerCase().split(/\s+/);
+            const words = text.toLowerCase().split(/\\s+/);
             let hinglishScore = 0;
             for (let w of words) {
                 w = w.replace(/[^a-z]/g, '');
@@ -169,7 +170,6 @@
             return 'English';
         }
 
-        // ===== মেসেজ যোগ =====
         function addMessage(text, sender, time = null) {
             const div = document.createElement('div');
             div.className = `msg ${sender}`;
@@ -181,7 +181,6 @@
             return div;
         }
 
-        // ===== টাইপিং =====
         function showTyping() {
             if (isTyping) return;
             isTyping = true;
@@ -192,13 +191,13 @@
             chatWindow.appendChild(div);
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
+
         function hideTyping() {
             const el = document.getElementById('typingIndicator');
             if (el) el.remove();
             isTyping = false;
         }
 
-        // ===== স্ট্যাটিক উত্তর (API ফেইল করলে) =====
         function getStaticAnswer(question) {
             const q = question.toLowerCase();
             if (q.includes('vip') || q.includes('key') || q.includes('unlock')) {
@@ -219,9 +218,8 @@
             return "I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer.";
         }
 
-        // ===== API কল (ক্যাশ বন্ধ + ডাবল প্রোক্সি + রিট্রাই) =====
-        async function getAIResponse(question, retries = 2) {
-            const fullPrompt = `
+        async function getAIResponse(question) {
+            const prompt = `
 You are the "Cyber Tools" support agent for the Cyber Tools app.
 
 **Your role:**
@@ -244,62 +242,20 @@ ${DOCUMENTATION}
 User question: ${question}
             `.trim();
 
-            const encoded = encodeURIComponent(fullPrompt);
-            const cacheBuster = `&_t=${Date.now()}`;
-
-            // ১. সরাসরি HTTPS চেষ্টা
-            try {
-                const directUrl = `${API_BASE}?text=${encoded}${cacheBuster}`;
-                const res = await fetch(directUrl, {
-                    headers: { 
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache'
-                    },
-                    signal: AbortSignal.timeout(8000)
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status && data.status === 'error') throw new Error(data.message);
-                    return data.reply || data.response || JSON.stringify(data);
-                }
-            } catch (_) { /* সরাসরি ব্যর্থ – প্রোক্সি চেষ্টা */ }
-
-            // ২. প্রোক্সি দিয়ে চেষ্টা (রিট্রাই সহ)
-            for (let attempt = 1; attempt <= retries; attempt++) {
-                for (const proxy of PROXIES) {
-                    try {
-                        const proxyUrl = proxy.includes('?') ? proxy : proxy + '?';
-                        const url = `${proxyUrl}${API_BASE}?text=${encoded}${cacheBuster}`;
-                        const res = await fetch(url, {
-                            headers: { 
-                                'Accept': 'application/json',
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                'Pragma': 'no-cache'
-                            },
-                            signal: AbortSignal.timeout(10000)
-                        });
-                        if (!res.ok) {
-                            const errText = await res.text();
-                            throw new Error(`HTTP ${res.status} – ${errText.slice(0, 50)}`);
-                        }
-                        const data = await res.json();
-                        if (data.status && data.status === 'error') {
-                            throw new Error(data.message || 'Service error');
-                        }
-                        return data.reply || data.response || JSON.stringify(data);
-                    } catch (err) {
-                        if (attempt === retries) {
-                            throw new Error('All proxies failed');
-                        }
-                        await new Promise(r => setTimeout(r, 1000 * attempt));
-                    }
-                }
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: prompt })
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`HTTP ${res.status}: ${errText.slice(0,50)}`);
             }
-            throw new Error('All proxies failed');
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            return data.reply;
         }
 
-        // ===== হ্যান্ডেল সেন্ড =====
         async function handleSend() {
             const question = userInput.value.trim();
             if (!question) return;
@@ -317,12 +273,12 @@ User question: ${question}
             try {
                 const reply = await getAIResponse(question);
                 hideTyping();
-                const formatted = reply.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                const formatted = reply.replace(/\\n/g, '<br>').replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
                 addMessage(formatted, 'bot');
             } catch (err) {
                 hideTyping();
                 const staticReply = getStaticAnswer(question);
-                const msg = '⚠️ Service offline – showing offline reply.\n\n' + staticReply;
+                const msg = '⚠️ Service offline – showing offline reply.\\n\\n' + staticReply;
                 addMessage(msg, 'bot');
                 console.error('API Error:', err);
             } finally {
@@ -331,7 +287,6 @@ User question: ${question}
             }
         }
 
-        // ===== ক্লিয়ার =====
         function clearChat() {
             chatWindow.innerHTML = '';
             const welcome = document.createElement('div');
@@ -341,7 +296,6 @@ User question: ${question}
             langLabel.textContent = 'English';
         }
 
-        // ===== ইভেন্ট =====
         sendBtn.addEventListener('click', handleSend);
         userInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -350,7 +304,7 @@ User question: ${question}
             }
         });
         clearBtn.addEventListener('click', clearChat);
-  // ===== লিংক =====
+
         document.getElementById('whatsappLink').addEventListener('click', (e) => {
             e.preventDefault();
             window.open('https://wa.me/917865875762?text=Support+needed', '_blank');
@@ -360,8 +314,66 @@ User question: ${question}
             window.open('https://t.me/your_support', '_blank');
         });
 
-        console.log('✅ Cyber Tools Support ready (HTTPS + cache disabled + dual proxy + retry)');
+        console.log('✅ Cyber Tools Support ready (Flask backend)');
     })();
 </script>
 </body>
 </html>
+'''
+
+# ===================================================================
+# রুট – পেজ রেন্ডার
+# ===================================================================
+@bp.route('/')
+def support_page():
+    return render_template_string(SUPPORT_HTML)
+
+# ===================================================================
+# চ্যাট API – আপনার ব্যাকেন্ড থেকে উত্তর দেয়
+# ===================================================================
+@bp.route('/chat', methods=['POST'])
+def chat():
+    data = request.get_json()
+    if not data or 'question' not in data:
+        return jsonify({'error': 'No question provided'}), 400
+
+    question = data['question']
+
+    # ===== আপনি এখানে আপনার নিজের AI/API বসাতে পারেন =====
+    # নিচে বাহ্যিক API-তে কল করার উদাহরণ (প্রোক্সি হিসেবে কাজ করবে)
+    try:
+        external_api = 'https://de3.bot-hosting.net:21007/kilwa-claude'
+        resp = requests.post(
+            external_api,
+            json={'text': question},
+            timeout=10,
+            headers={'Content-Type': 'application/json'}
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            reply = result.get('reply') or result.get('response') or 'No reply'
+            return jsonify({'reply': reply})
+        else:
+            # API ব্যর্থ – স্ট্যাটিক উত্তর
+            static = get_static_answer(question)
+            return jsonify({'reply': static})
+    except Exception as e:
+        static = get_static_answer(question)
+        return jsonify({'reply': static})
+# ===================================================================
+# স্ট্যাটিক উত্তর ফাংশন (ব্যাকেন্ডে)
+# ===================================================================
+def get_static_answer(question):
+    q = question.lower()
+    if 'vip' in q or 'key' in q or 'unlock' in q:
+        return "VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram."
+    if 'group' in q or 'channel' in q or 'community' in q:
+        return "You can join our WhatsApp Group (https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME) or YouTube Channel (https://youtube.com/@hackingcyber-q4s)."
+    if 'developer' in q or 'arif' in q or 'who made' in q:
+        return "The app is developed by Arif. He is a full-stack developer specializing in cybersecurity and app development."
+    if 'tool' in q or 'feature' in q:
+        return "Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more."
+    if 'download' in q or 'apk' in q:
+        return "You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu."
+    return "I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer."
+```
