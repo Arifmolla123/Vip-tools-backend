@@ -16,7 +16,6 @@
         overflow: hidden;
         padding: 20px;
     }
-    /* অ্যানিমেটেড ব্যাকগ্রাউন্ড */
     body::before {
         content: '';
         position: fixed;
@@ -35,7 +34,6 @@
 
     .container { max-width: 500px; width: 100%; }
 
-    /* গ্লাস কার্ড */
     .glass-card {
         background: rgba(10, 18, 34, 0.65);
         backdrop-filter: blur(20px);
@@ -59,7 +57,6 @@
         pointer-events: none;
     }
 
-    /* ব্র্যান্ড */
     .brand {
         font-size: 2.2rem;
         font-weight: 800;
@@ -100,7 +97,32 @@
         font-weight: 300;
     }
 
-    /* ফর্ম এলিমেন্ট */
+    /* ✅ এরর মেসেজ স্টাইল */
+    .error-box {
+        background: rgba(255, 50, 50, 0.08);
+        border: 1px solid rgba(255, 50, 50, 0.2);
+        border-radius: 60px;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #ff8a8a;
+        font-size: 0.9rem;
+        font-weight: 500;
+        backdrop-filter: blur(4px);
+        animation: shake 0.4s ease;
+    }
+    .error-box i {
+        font-size: 1.2rem;
+        color: #ff6a6a;
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+    }
+
     .form-group {
         margin-bottom: 18px;
     }
@@ -148,7 +170,6 @@
         color: #4a6a7a;
     }
 
-    /* লগইন বাটন */
     .btn-login {
         width: 100%;
         padding: 14px 20px;
@@ -177,7 +198,6 @@
         transform: scale(0.97);
     }
 
-    /* লিংক */
     .auth-links {
         text-align: center;
         margin-top: 24px;
@@ -203,13 +223,13 @@
         border-color: rgba(0, 255, 255, 0.1);
     }
 
-    /* রেস্পন্সিভ */
     @media (max-width: 480px) {
         .glass-card { padding: 28px 20px; }
         .brand { font-size: 1.6rem; }
         .brand i { font-size: 2rem; }
         .form-group input { padding: 12px 16px 12px 42px; font-size: 0.9rem; }
         .btn-login { font-size: 1rem; padding: 12px 16px; }
+        .error-box { font-size: 0.8rem; padding: 10px 16px; }
     }
 </style>
 </head>
@@ -217,7 +237,6 @@
 <div class="container">
     <div class="glass-card">
 
-        <!-- ব্র্যান্ড -->
         <div class="brand">
             <i class="fas fa-shield-halved"></i>
             CYBER PHISH
@@ -225,7 +244,14 @@
         </div>
         <div class="sub-title"><i class="fas fa-lock" style="margin-right: 8px;"></i> Secure Access</div>
 
-        <!-- লগইন ফর্ম -->
+        <!-- ✅ এরর মেসেজ দেখানো -->
+        {% if error %}
+        <div class="error-box">
+            <i class="fas fa-exclamation-circle"></i>
+            {{ error }}
+        </div>
+        {% endif %}
+
         <form method="post" action="/phis/login">
             <div class="form-group">
                 <label><i class="fas fa-user"></i> Username</label>
@@ -244,7 +270,6 @@
             <button type="submit" class="btn-login"><i class="fas fa-arrow-right-to-bracket"></i> Login</button>
         </form>
 
-        <!-- লিংক -->
         <div class="auth-links">
             <a href="/phis/register"><i class="fas fa-user-plus"></i> Create new account</a>
         </div>
@@ -252,4 +277,4 @@
     </div>
 </div>
 </body>
-   </html>
+                                                                                           </html>
