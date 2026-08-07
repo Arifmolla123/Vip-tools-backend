@@ -145,7 +145,6 @@ SUPPORT_HTML = r'''
         .msg.bot ul { margin: 6px 0 6px 18px; padding-left: 6px; list-style-type: none; }
         .msg.bot ul li { position: relative; padding-left: 20px; margin-bottom: 4px; }
         .msg.bot ul li::before { content: "▸"; position: absolute; left: 0; color: #1fc7b0; font-weight: bold; }
-        .msg.bot .highlight { background: #1fc7b022; padding: 2px 10px; border-radius: 12px; border: 1px solid #1fc7b044; display: inline-block; }
         .msg .time {
             font-size: 0.6rem;
             color: #5f8a88;
@@ -279,7 +278,6 @@ SUPPORT_HTML = r'''
 </head>
 <body>
 <div class="app glow-border">
-    <!-- HEADER -->
     <div class="header">
         <div class="header-left">
             <div class="icon"><i class="fas fa-headset"></i></div>
@@ -293,7 +291,6 @@ SUPPORT_HTML = r'''
         </div>
     </div>
 
-    <!-- CHAT WINDOW -->
     <div class="chat-window" id="chatWindow">
         <div class="msg bot">
             <div class="welcome-text">👋 Welcome to <strong>Cyber Tools Support</strong></div>
@@ -303,14 +300,12 @@ SUPPORT_HTML = r'''
         </div>
     </div>
 
-    <!-- INPUT -->
     <div class="input-area">
         <input type="text" id="userInput" placeholder="Type your question here...">
         <button class="btn" id="sendBtn"><i class="fas fa-paper-plane"></i> Send</button>
         <button class="btn btn-outline" id="clearBtn" title="Clear chat"><i class="fas fa-eraser"></i></button>
     </div>
 
-    <!-- FOOTER -->
     <div class="footer">
         <span><i class="fas fa-shield-alt"></i> Secure</span>
         <a href="#" id="whatsappLink"><i class="fab fa-whatsapp"></i> WhatsApp</a>
@@ -331,7 +326,6 @@ SUPPORT_HTML = r'''
 
         var API_URL = '/support/chat';
 
-        // ===== ডকুমেন্টেশন (AI-কে দেওয়া হবে) =====
         var DOCUMENTATION = `
 === CYBER TOOLS APP – COMPLETE GUIDE ===
 
@@ -343,7 +337,7 @@ SUPPORT_HTML = r'''
 
 🔹 VIP UNLOCK
 • Enter your registered Name and VIP Key.
-• VIP Key is pre-generated and stored in Firebase.
+• VIP Key is pre-generated and stored securely.
 • Users CANNOT generate keys themselves – they must contact the developer.
 • To get a VIP Key, contact developer Arif via WhatsApp or Telegram.
 • On success → localStorage vip_status = 'active'
@@ -355,7 +349,7 @@ SUPPORT_HTML = r'''
 
 🔹 SETTINGS
 • View your VIP credentials.
-• Delete account → stores in deleted_accounts with expiry. Only admin (Arif) can reactivate.
+• Delete account → only admin (Arif) can reactivate.
 
 🔹 SHARE APP
 • This page is already inside the app. Users do NOT need an external download link.
@@ -379,7 +373,6 @@ SUPPORT_HTML = r'''
 
         var isTyping = false;
 
-        // ===== ভাষা ডিটেক্ট =====
         function detectLanguage(text) {
             if (/[\u0980-\u09FF]/.test(text)) return 'বাংলা';
             if (/[\u0900-\u097F]/.test(text)) return 'हिन्दी';
@@ -395,7 +388,6 @@ SUPPORT_HTML = r'''
             return 'English';
         }
 
-        // ===== মেসেজ যোগ =====
         function addMessage(text, sender, time) {
             if (!time) time = new Date();
             var div = document.createElement('div');
@@ -409,7 +401,6 @@ SUPPORT_HTML = r'''
             return div;
         }
 
-        // ===== টাইপিং ইন্ডিকেটর =====
         function showTyping() {
             if (isTyping) return;
             isTyping = true;
@@ -426,9 +417,22 @@ SUPPORT_HTML = r'''
             isTyping = false;
         }
 
-        // ===== স্ট্যাটিক উত্তর (API ফেইল করলে) =====
         function getStaticAnswer(question) {
             var q = question.toLowerCase();
+            // ইলিগ্যাল বা সিক্রেট প্রশ্নের জন্য ডিফল্ট মেসেজ
+            var illegalKeywords = ['hack', 'crack', 'exploit', 'malware', 'virus', 'ransom', 'ddos', 'phish', 'spam', 'illegal', 'পাসওয়ার্ড', 'হ্যাক', 'ক্র্যাক', 'ফিশিং', 'স্পাই', 'ম্যালওয়্যার', 'আক্রমণ', 'সিক্রেট', 'firebase', 'ডাটাবেস', 'key'];
+            var isIllegal = false;
+            for (var i = 0; i < illegalKeywords.length; i++) {
+                if (q.indexOf(illegalKeywords[i]) !== -1) {
+                    isIllegal = true;
+                    break;
+                }
+            }
+            if (isIllegal) {
+                return "আমি সাইবার টুলস সাপোর্ট এজেন্ট। আমি শুধু অ্যাপের ফিচার, VIP আনলক, টুলস, গ্রুপ, চ্যানেল বা ডেভেলপার সম্পর্কে প্রশ্নের উত্তর দিতে পারি। দয়া করে অ্যাপ সম্পর্কিত প্রশ্ন করুন।";
+            }
+
+            // বাকি স্ট্যাটিক উত্তর
             if (q.indexOf('vip') !== -1 || q.indexOf('key') !== -1 || q.indexOf('unlock') !== -1) {
                 return "🔑 VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram.";
             }
@@ -444,37 +448,29 @@ SUPPORT_HTML = r'''
             if (q.indexOf('download') !== -1 || q.indexOf('apk') !== -1) {
                 return "📱 You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu.";
             }
-            return "🤖 I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer.";
+            return "আমি সাইবার টুলস সাপোর্ট এজেন্ট। আমি শুধু অ্যাপের ফিচার, VIP আনলক, টুলস, গ্রুপ, চ্যানেল বা ডেভেলপার সম্পর্কে প্রশ্নের উত্তর দিতে পারি। দয়া করে অ্যাপ সম্পর্কিত প্রশ্ন করুন।";
         }
 
-        // ===== AI রেসপন্স ফেচ =====
         async function getAIResponse(question, detectedLang) {
             var prompt = `
-You are the "Cyber Tools" support agent. You must follow these rules strictly:
+You are the "Cyber Tools" support agent. Follow these rules strictly:
 
 1. **CRITICAL: Reply EXACTLY in the same language as the user's question.**
-   Detected language of user: ${detectedLang}.
-   If user wrote in Bengali, reply in Bengali.
-   If user wrote in Hindi, reply in Hindi.
-   If user wrote in Hinglish (Hindi written with Latin script), reply in Hinglish.
-   If user wrote in English, reply in English.
-   If user wrote in Arabic/Urdu, reply in that language.
-   NEVER switch language.
+   Detected language: ${detectedLang}.
 
-2. **Format your response beautifully and cleanly**:
-   - Use plain text, NOT markdown.
-   - Do NOT use ** or # or __ or any markdown symbols.
-   - Use bullet points like "• " for lists.
+2. **DO NOT answer any illegal, hacking, or secret questions.**
+   If user asks about hacking, cracking, exploits, malware, virus, DDoS, phishing, spying, passwords, database, Firebase, or any secret/internal info:
+   Reply: "আমি সাইবার টুলস সাপোর্ট এজেন্ট। আমি শুধু অ্যাপের ফিচার, VIP আনলক, টুলস, গ্রুপ, চ্যানেল বা ডেভেলপার সম্পর্কে প্রশ্নের উত্তর দিতে পারি। দয়া করে অ্যাপ সম্পর্কিত প্রশ্ন করুন।" (in the same language)
+
+3. **Format your response cleanly**:
+   - Use plain text, avoid markdown like #, **, __.
+   - Use bullet points with "• " for lists.
    - Use blank lines between paragraphs.
-   - Use simple bolding by surrounding important words with ** (I will convert them to bold), but try to avoid excessive bolding.
-   - Keep paragraphs short.
-   - Use emojis sparingly and appropriately (e.g., 📱, 🔑, 👨‍💻).
+   - Use emojis moderately (📱, 🔑, 👨‍💻, etc.).
 
-3. **Never** include disclaimers like "I am an AI", "as an AI", "I can't", etc.
+4. **Never** say "I am an AI", "as an AI", "I can't".
 
-4. **If user asks about hacking or illegal activities**: politely say you only assist with app features.
-
-5. **Use this documentation** for all answers about the app:
+5. **Use this documentation** for app-related answers:
 ${DOCUMENTATION}
 
 User question: ${question}
@@ -494,7 +490,6 @@ User question: ${question}
             return data.reply;
         }
 
-         // ===== হ্যান্ডেল সেন্ড =====
         async function handleSend() {
             var question = userInput.value.trim();
             if (!question) return;
@@ -512,14 +507,13 @@ User question: ${question}
             try {
                 var reply = await getAIResponse(question, lang);
                 hideTyping();
-                // Clean up any stray markdown: remove # headers (convert to bold), remove ** if present, but we already told AI not to use them
                 var formatted = reply
                     .replace(/\\n/g, '<br>')
-                    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>') // keep bold
-                    .replace(/^#+\\s*/gm, '') // remove heading hashes
-                    .replace(/^• /gm, '• ') // ensure bullet points
+                    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
+                    .replace(/^#+\\s*/gm, '')
+                    .replace(/^• /gm, '• ')
                     .replace(/^- /gm, '• ')
-                    .replace(/^\\d+\\. /gm, function(m) { return '<br>' + m; }); // number lists
+                    .replace(/^\\d+\\. /gm, function(m) { return '<br>' + m; });
                 addMessage(formatted, 'bot');
             } catch (err) {
                 hideTyping();
@@ -533,7 +527,6 @@ User question: ${question}
             }
         }
 
-        // ===== ক্লিয়ার চ্যাট =====
         function clearChat() {
             chatWindow.innerHTML = '';
             var welcome = document.createElement('div');
@@ -543,7 +536,6 @@ User question: ${question}
             langLabel.textContent = 'English';
         }
 
-        // ===== ইভেন্ট লিসেনার =====
         sendBtn.addEventListener('click', handleSend);
         userInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -553,7 +545,6 @@ User question: ${question}
         });
         clearBtn.addEventListener('click', clearChat);
 
-        // ===== ফুটার লিংক =====
         document.getElementById('whatsappLink').addEventListener('click', function(e) {
             e.preventDefault();
             window.open('https://wa.me/917865875762?text=Support+needed', '_blank');
@@ -622,6 +613,12 @@ def call_ai_api(prompt):
 
 def get_static_answer(question):
     q = question.lower()
+    # ইলিগ্যাল বা সিক্রেট কীওয়ার্ড
+    illegal_keywords = ['hack', 'crack', 'exploit', 'malware', 'virus', 'ransom', 'ddos', 'phish', 'spam', 'illegal', 'পাসওয়ার্ড', 'হ্যাক', 'ক্র্যাক', 'ফিশিং', 'স্পাই', 'ম্যালওয়্যার', 'আক্রমণ', 'সিক্রেট', 'firebase', 'ডাটাবেস', 'key']
+    for word in illegal_keywords:
+        if word in q:
+            return "আমি সাইবার টুলস সাপোর্ট এজেন্ট। আমি শুধু অ্যাপের ফিচার, VIP আনলক, টুলস, গ্রুপ, চ্যানেল বা ডেভেলপার সম্পর্কে প্রশ্নের উত্তর দিতে পারি। দয়া করে অ্যাপ সম্পর্কিত প্রশ্ন করুন।"
+
     if 'vip' in q or 'key' in q or 'unlock' in q:
         return "🔑 VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram."
     if 'group' in q or 'channel' in q or 'community' in q:
@@ -632,4 +629,4 @@ def get_static_answer(question):
         return "🛠️ Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more."
     if 'download' in q or 'apk' in q:
         return "📱 You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu."
-    return "🤖 I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer."
+    return "আমি সাইবার টুলস সাপোর্ট এজেন্ট। আমি শুধু অ্যাপের ফিচার, VIP আনলক, টুলস, গ্রুপ, চ্যানেল বা ডেভেলপার সম্পর্কে প্রশ্নের উত্তর দিতে পারি। দয়া করে অ্যাপ সম্পর্কিত প্রশ্ন করুন।"
