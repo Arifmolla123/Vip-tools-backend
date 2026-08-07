@@ -32,7 +32,8 @@
         {% for link in links %}
         <div class="link-card">
             <span class="badge">{{ link.template.upper() }}</span>
-            <code>{{ host_url }}f/{{ link.link_id }}</code>
+            <!-- ✅ এখানে /phis/ যোগ করা হয়েছে -->
+            <code>{{ host_url }}/phis/f/{{ link.link_id }}</code>
             <div class="flex-between">
                 <small>Created: {{ link.created_at }}</small>
                 <div>
