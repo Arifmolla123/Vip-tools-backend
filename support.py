@@ -307,9 +307,6 @@ def support_page():
     return render_template_string(SUPPORT_HTML)
 
 
-# =============================================================
-# ব্যাকেন্ড AI কল – নতুন এন্ডপয়েন্ট ব্যবহার
-# =============================================================
 @bp.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
@@ -323,63 +320,39 @@ def chat():
 
 def call_ai_api(prompt):
     """
-    একটি ফ্রি ওপেন-সোর্স API ব্যবহার করছি যা Render থেকে অ্যাক্সেসযোগ্য
+    KILWA CLAUDE API – GET মেথড ব্যবহার (যেমন ডকুমেন্টেশনে বলা আছে)
     """
-    # নতুন API – এটি অনেক ডেভেলপার ব্যবহার করে, CORS-মুক্ত
-    endpoint = 'https://api.weijia.workers.dev/'
+    endpoint = 'http://de3.bot-hosting.net:21007/kilwa-claude'
 
     try:
-        logger.info(f"Calling Weijia API: {endpoint}")
-        resp = requests.post(
+        logger.info(f"Calling KILWA API: {endpoint}")
+        resp = requests.get(
             endpoint,
-            json={'text': prompt},
+            params={'text': prompt},
             timeout=20,
-            verify=False,
-            headers={'User-Agent': 'CyberTools-Support/1.0', 'Content-Type': 'application/json'}
+            headers={'User-Agent': 'CyberTools-Support/1.0'}
         )
-        logger.info(f"Weijia API status: {resp.status_code}")
+        logger.info(f"KILWA API status: {resp.status_code}")
 
         if resp.status_code == 200:
             try:
                 result = resp.json()
-                # বিভিন্ন রেসপন্স ফরম্যাট চেক
-                reply = result.get('reply') or result.get('response') or result.get('text') or result.get('message')
+                reply = result.get('reply') or result.get('response')
                 if reply:
-                    logger.info("✅ Weijia API success")
+                    logger.info("✅ KILWA API success")
                     return reply
                 else:
-                    logger.warning(f"Weijia returned JSON without reply: {result}")
+                    logger.warning(f"KILWA returned no reply: {result}")
             except json.JSONDecodeError:
-                # টেক্সট রেসপন্স
                 text = resp.text.strip()
                 if text:
-                    logger.info("✅ Weijia API returned text")
+                    logger.info("✅ KILWA returned text")
                     return text
-
     except Exception as e:
-        logger.error(f"Weijia API error: {str(e)[:100]}")
-  # যদি Weijia ব্যর্থ হয়, তাহলে অন্য একটি ফ্রি API চেষ্টা
-    try:
-        backup_endpoint = 'https://api.popcat.xyz/chat'
-        logger.info(f"Trying backup API: {backup_endpoint}")
-        resp = requests.get(
-            backup_endpoint,
-            params={'msg': prompt},
-            timeout=20,
-            verify=False,
-            headers={'User-Agent': 'CyberTools-Support/1.0'}
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            reply = data.get('response') or data.get('reply')
-            if reply:
-                logger.info("✅ Backup API success")
-                return reply
-    except Exception as e:
-        logger.error(f"Backup API error: {str(e)[:100]}")
+        logger.error(f"KILWA API error: {str(e)[:100]}")
 
-    # সব ব্যর্থ – স্ট্যাটিক উত্তর
-    logger.error("All API attempts failed. Falling back to static.")
+    # ব্যর্থ হলে স্ট্যাটিক
+    logger.error("KILWA API failed. Falling back to static.")
     return get_static_answer(prompt)
 
 
