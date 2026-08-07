@@ -1,24 +1,25 @@
 # -*- coding: utf-8 -*-
-from flask import Blueprint, render_template_string, request, jsonify
+from flask import Blueprint, render_template_string, request, jsonify, session
 import requests
 import json
 import logging
+import uuid
 
-bp = Blueprint('image_studio', __name__, url_prefix='/image-studio')
+bp = Blueprint('image_studio', __name__, url_prefix='/image_studio')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# HTML টেমপ্লেট (ইমেজ স্টুডিও পেজ)
+# HTML টেমপ্লেট – DeepSeek চ্যাট ইন্টারফেস
 # ============================================================
-IMAGE_STUDIO_HTML = r'''
+DEEPSEEK_HTML = r'''
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Cyber Tools – Image Studio</title>
+    <title>Cyber Tools – DeepSeek Chat</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -31,25 +32,30 @@ IMAGE_STUDIO_HTML = r'''
         .header-left .icon { font-size: 2.2rem; color: #1fc7b0; }
         .header-right .lang-badge { background: #0d1a26; padding: 4px 16px; border-radius: 40px; border: 1px solid #1e3347; font-size: 0.7rem; color: #88b8b0; display: flex; align-items: center; gap: 6px; }
         .header-right .lang-badge i { color: #1fc7b0; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 0.85rem; font-weight: 500; color: #b0d0d0; margin-bottom: 5px; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; border-radius: 14px; background: #0a121e; border: 1px solid #1a2e3e; color: #e0f0ec; font-size: 0.95rem; outline: none; transition: 0.2s; font-family: inherit; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #1fc7b0; box-shadow: 0 0 0 3px #1fc7b022; }
-        .form-group textarea { resize: vertical; min-height: 70px; }
-        .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
-        .form-row .form-group { flex: 1; min-width: 140px; }
-        .btn { background: #1fc7b0; border: none; color: #0b1119; padding: 14px 32px; border-radius: 60px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: 0.15s; display: inline-flex; align-items: center; gap: 10px; width: 100%; justify-content: center; }
-        .btn:hover { background: #17b09a; transform: scale(1.01); }
-        .btn:disabled { opacity: 0.5; pointer-events: none; }
-        .result-box { margin-top: 24px; padding: 18px; border-radius: 20px; background: #0a121e; border: 1px solid #1a2e3e; display: none; flex-direction: column; gap: 14px; }
-        .result-box.show { display: flex; }
-        .result-box .preview img { max-width: 100%; border-radius: 16px; border: 1px solid #1e3347; display: block; }
-        .result-box .info { font-size: 0.85rem; color: #88b8b0; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; border-top: 1px solid #1a2e3e; padding-top: 12px; }
-        .result-box .info .badge { background: #1fc7b022; padding: 4px 14px; border-radius: 40px; border: 1px solid #1fc7b044; font-size: 0.75rem; }
-        .result-box .info .dev-credit { color: #5f8a88; font-size: 0.7rem; }
-        .loader { display: none; text-align: center; padding: 20px 0; color: #88b8b0; }
-        .loader i { font-size: 2rem; color: #1fc7b0; animation: spin 1s linear infinite; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .chat-window { background: #0a121e; border-radius: 24px; padding: 16px; flex: 1; min-height: 400px; max-height: 600px; overflow-y: auto; border: 1px solid #1a2e3e; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+        .chat-window::-webkit-scrollbar { width: 4px; }
+        .chat-window::-webkit-scrollbar-track { background: #0a121e; }
+        .chat-window::-webkit-scrollbar-thumb { background: #1fc7b0; border-radius: 10px; }
+        .msg { max-width: 88%; padding: 14px 18px; border-radius: 18px; font-size: 0.95rem; line-height: 1.7; word-wrap: break-word; animation: fadeUp 0.3s ease; }
+        .msg.user { align-self: flex-end; background: linear-gradient(135deg, #1a2e3e, #0f1f2e); border-bottom-right-radius: 4px; border: 1px solid #2a4a5a; color: #d0f0ea; }
+        .msg.bot { align-self: flex-start; background: #0d1a26; border-left: 4px solid #1fc7b0; border-bottom-left-radius: 4px; color: #e0f0ec; white-space: pre-wrap; }
+        .msg.bot strong { color: #b0fff0; }
+        .msg .time { font-size: 0.6rem; color: #5f8a88; margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+        .typing-indicator { align-self: flex-start; background: #0d1a26; padding: 10px 18px; border-radius: 30px; border-left: 4px solid #1fc7b0; display: flex; align-items: center; gap: 6px; color: #88b8b0; font-size: 0.8rem; }
+        .typing-indicator .dot { display: inline-block; width: 8px; height: 8px; background: #1fc7b0; border-radius: 50%; animation: bounce 1.2s infinite; }
+        .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .input-area { display: flex; gap: 10px; flex-wrap: wrap; background: #0a121e; border-radius: 60px; padding: 6px 6px 6px 20px; border: 1px solid #1a2e3e; transition: 0.2s; }
+        .input-area:focus-within { border-color: #1fc7b0; box-shadow: 0 0 0 3px #1fc7b022; }
+        .input-area input { flex: 1; background: transparent; border: none; color: #d0f0ea; font-size: 0.95rem; padding: 10px 0; outline: none; min-width: 140px; font-family: inherit; }
+        .input-area input::placeholder { color: #3a5a5a; }
+        .input-area .btn { background: #1fc7b0; border: none; color: #0b1119; padding: 10px 24px; border-radius: 60px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .input-area .btn:active { transform: scale(0.95); }
+        .input-area .btn:disabled { opacity: 0.5; pointer-events: none; }
+        .input-area .btn-outline { background: transparent; color: #88b8b0; border: 1px solid #1a2e3e; padding: 10px 16px; }
+        .input-area .btn-outline:hover { border-color: #1fc7b0; color: #b0fff0; }
         .footer { text-align: center; margin-top: 20px; font-size: 0.7rem; color: #2a4a5a; display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; border-top: 1px solid #0f1a26; padding-top: 16px; }
         .footer a { color: #3a6a7a; text-decoration: none; transition: 0.2s; }
         .footer a:hover { color: #1fc7b0; }
@@ -57,7 +63,11 @@ IMAGE_STUDIO_HTML = r'''
         .attitude i { color: #1fc7b0; font-size: 1.2rem; }
         .back-link { display: inline-flex; align-items: center; gap: 8px; color: #88b8b0; text-decoration: none; font-size: 0.85rem; margin-bottom: 12px; transition: 0.2s; }
         .back-link:hover { color: #1fc7b0; }
-        @media (max-width: 480px) { .app { padding: 16px; } .header-left .brand h1 { font-size: 1.3rem; } .form-row { flex-direction: column; } }
+        .model-selector { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .model-selector select { background: #0a121e; border: 1px solid #1a2e3e; color: #e0f0ec; padding: 8px 16px; border-radius: 40px; font-size: 0.85rem; outline: none; }
+        .model-selector select:focus { border-color: #1fc7b0; }
+        .conv-id { font-size: 0.7rem; color: #5f8a88; text-align: center; margin-top: 8px; }
+        @media (max-width: 480px) { .app { padding: 16px; } .header-left .brand h1 { font-size: 1.3rem; } }
     </style>
 </head>
 <body>
@@ -66,10 +76,10 @@ IMAGE_STUDIO_HTML = r'''
 
         <div class="header">
             <div class="header-left">
-                <div class="icon"><i class="fas fa-image"></i></div>
+                <div class="icon"><i class="fas fa-comments"></i></div>
                 <div class="brand">
                     <h1>Cyber Tools</h1>
-                    <span>Image Studio · by Arif</span>
+                    <span>DeepSeek Chat Pro · by Arif</span>
                 </div>
             </div>
             <div class="header-right">
@@ -81,70 +91,37 @@ IMAGE_STUDIO_HTML = r'''
             <i class="fas fa-robot"></i>
             <span>
                 <strong>🛡️ Cyber Tools Attitude:</strong> 
-                Generate or edit images with AI — Hinglish, বাংলা, हिन्दी, العربية সব ভাষায় কাজ করে। 
-                <span style="color:#5f8a88;font-size:0.8rem;">(Prompt যেকোনো ভাষায় দিন)</span>
+                DeepSeek AI with Memory — Hinglish, বাংলা, हिन्दी, العربية সব ভাষায় কাজ করে। 
+                <span style="color:#5f8a88;font-size:0.8rem;">(যেকোনো ভাষায় প্রশ্ন করুন)</span>
             </span>
         </div>
 
-        <form id="imageForm">
-            <div class="form-group">
-                <label for="prompt"><i class="fas fa-pen"></i> Prompt (Text / Instruction)</label>
-                <textarea id="prompt" placeholder="e.g. مدينة مستقبلية مع أضواء نيون  ||  Make the background a tropical forest" required></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="links"><i class="fas fa-link"></i> Image URL(s) for Editing (optional)</label>
-                <input type="text" id="links" placeholder="https://i.imgur.com/example.jpg  or  link1.jpg, link2.jpg" />
-                <div style="font-size:0.7rem;color:#5f8a88;margin-top:4px;">একাধিক লিংক কমা (,) দিয়ে আলাদা করুন</div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="ratio">Ratio</label>
-                    <select id="ratio">
-                        <option value="1:1">1:1</option>
-                        <option value="16:9" selected>16:9</option>
-                        <option value="9:16">9:16</option>
-                        <option value="4:3">4:3</option>
-                        <option value="3:4">3:4</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="res">Resolution</label>
-                    <select id="res">
-                        <option value="1K">1K</option>
-                        <option value="2K">2K</option>
-                        <option value="4K" selected>4K</option>
-                    </select>
-                </div>
-            </div>
-
-            <button type="submit" class="btn" id="submitBtn">
-                <i class="fas fa-wand-magic-sparkles"></i> Generate / Edit Image
+        <div class="model-selector">
+            <select id="modelSelect">
+                <option value="1">DeepSeek V3.2</option>
+                <option value="2">DeepSeek R1</option>
+                <option value="3">DeepSeek Coder</option>
+            </select>
+            <button class="btn btn-outline" id="newChatBtn" style="padding:8px 20px; width:auto;">
+                <i class="fas fa-plus"></i> New Chat
             </button>
-        </form>
-
-        <div class="loader" id="loader">
-            <i class="fas fa-spinner"></i>
-            <div style="margin-top:8px;">Processing... please wait</div>
         </div>
 
-        <div class="result-box" id="resultBox">
-            <div class="preview" id="imagePreview"></div>
-            <div class="info" id="resultInfo">
-                <span class="badge" id="modeBadge">Mode: Create</span>
-                <span class="badge" id="resBadge">4K</span>
-                <span class="dev-credit" id="devCredit">⚡ Developer: Arif</span>
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">
-                <button class="btn" style="flex:1; background:#1a2e3e; color:#b0d0d0; padding:10px;" id="downloadBtn">
-                    <i class="fas fa-download"></i> Download Image
-                </button>
-                <button class="btn" style="flex:1; background:#1a2e3e; color:#b0d0d0; padding:10px;" id="copyBtn">
-                    <i class="fas fa-copy"></i> Copy URL
-                </button>
+        <div class="chat-window" id="chatWindow">
+            <div class="msg bot">
+                👋 Welcome to <strong>DeepSeek Chat Pro</strong><br>
+                Ask me anything — I remember our conversation! 😊
+                <div class="time"><i class="far fa-clock"></i> Now</div>
             </div>
         </div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Type your message here..." />
+            <button class="btn" id="sendBtn"><i class="fas fa-paper-plane"></i> Send</button>
+            <button class="btn btn-outline" id="clearBtn" title="Clear chat"><i class="fas fa-eraser"></i></button>
+        </div>
+
+        <div class="conv-id" id="convIdDisplay">Conversation ID: <span id="convIdValue">None</span></div>
 
         <div class="footer">
             <span><i class="fas fa-shield-alt"></i> Cyber Tools · Arif</span>
@@ -158,160 +135,127 @@ IMAGE_STUDIO_HTML = r'''
         (function() {
             "use strict";
 
-            // ===== আপনার ব্লুপ্রিন্টের প্রোক্সি এন্ডপয়েন্ট =====
-            const API_URL = '/image-studio/image';
+            const API_URL = '/deepseek/chat';
 
-            const form = document.getElementById('imageForm');
-            const promptEl = document.getElementById('prompt');
-            const linksEl = document.getElementById('links');
-            const ratioEl = document.getElementById('ratio');
-            const resEl = document.getElementById('res');
-            const submitBtn = document.getElementById('submitBtn');
-            const loader = document.getElementById('loader');
-            const resultBox = document.getElementById('resultBox');
-            const imagePreview = document.getElementById('imagePreview');
-            const modeBadge = document.getElementById('modeBadge');
-            const resBadge = document.getElementById('resBadge');
-            const devCredit = document.getElementById('devCredit');
-            const downloadBtn = document.getElementById('downloadBtn');
-            const copyBtn = document.getElementById('copyBtn');
+            const chatWindow = document.getElementById('chatWindow');
+            const userInput = document.getElementById('userInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const newChatBtn = document.getElementById('newChatBtn');
+            const modelSelect = document.getElementById('modelSelect');
+            const convIdValue = document.getElementById('convIdValue');
 
-            let currentImageUrl = '';
+            let conversationId = null;
+            let isTyping = false;
 
-            function detectLanguage(text) {
-                if (/[\u0980-\u09FF]/.test(text)) return 'বাংলা';
-                if (/[\u0900-\u097F]/.test(text)) return 'हिन्दी';
-                if (/[\u0600-\u06FF]/.test(text)) return 'العربية';
-                const hinglishWords = ['kya', 'hai', 'nahi', 'aap', 'hum', 'tum', 'main', 'kaise', 'kyon', 'ho', 'hain', 'tha', 'thi',
-                    'the', 'raha', 'rahi', 'rahe', 'sakta', 'sakti', 'sakte', 'chahiye', 'mil', 'de', 'le', 'kar', 'ko', 'se', 'mein',
-                    'pe', 'ki', 'ka', 'ke', 'ne', 'bhi', 'hi', 'to', 'nahi', 'haan', 'ji', 'sir', 'madam', 'apka', 'apko', 'mera',
-                    'tera', 'uska', 'unki', 'inke', 'jiska', 'jiski'
-                ];
-                const words = text.toLowerCase().split(/\s+/);
-                let score = 0;
-                for (const w of words) {
-                    const clean = w.replace(/[^a-z]/g, '');
-                    if (hinglishWords.includes(clean)) score++;
-                }
-                if (score >= 2) return 'Hinglish';
-                return 'English';
+            function addMessage(text, sender, time) {
+                if (!time) time = new Date();
+                const div = document.createElement('div');
+                div.className = 'msg ' + sender;
+                const timeStr = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
+                div.innerHTML = text + `<div class="time"><i class="far fa-clock"></i> ${timeStr}</div>`;
+                chatWindow.appendChild(div);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                return div;
             }
 
-            function getAttitudeMessage(lang) {
-                const msgs = {
-                    'বাংলা': '🔥 সাইবার টুলস – ইমেজ স্টুডিও (Arif)। আপনার প্রম্পট প্রক্রিয়াকরণ হচ্ছে...',
-                    'हिन्दी': '🔥 साइबर टूल्स – इमेज स्टूडियो (Arif)। आपका प्रॉम्प्ट प्रोसेस हो रहा है...',
-                    'العربية': '🔥 سايبر تولز – استوديو الصور (Arif). جاري معالجة طلبك...',
-                    'Hinglish': '🔥 Cyber Tools – Image Studio (Arif). Your prompt is being processed...',
-                    'English': '🔥 Cyber Tools – Image Studio (Arif). Your prompt is being processed...'
-                };
-                return msgs[lang] || msgs['English'];
+            function showTyping() {
+                if (isTyping) return;
+                isTyping = true;
+                const div = document.createElement('div');
+                div.className = 'typing-indicator';
+                div.id = 'typingIndicator';
+                div.innerHTML = '<span>DeepSeek is thinking</span><span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+                chatWindow.appendChild(div);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
             }
 
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
+            function hideTyping() {
+                const el = document.getElementById('typingIndicator');
+                if (el) el.remove();
+                isTyping = false;
+            }
 
-                const prompt = promptEl.value.trim();
-                if (!prompt) {
-                    alert('Please enter a prompt.');
-                    return;
-                }
+            async function sendMessage() {
+                const message = userInput.value.trim();
+                if (!message) return;
 
-                const linksRaw = linksEl.value.trim();
-                const ratio = ratioEl.value;
-                const res = resEl.value;
-                const lang = detectLanguage(prompt);
+                addMessage(message, 'user');
+                userInput.value = '';
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                loader.style.display = 'block';
-                resultBox.classList.remove('show');
-                imagePreview.innerHTML = '';
-                currentImageUrl = '';
-
-                const formData = new FormData();
-                formData.append('text', prompt);
-                formData.append('ratio', ratio);
-                formData.append('res', res);
-
-                if (linksRaw) {
-                    const links = linksRaw.split(',').map(s => s.trim()).filter(s => s.length > 0);
-                    if (links.length === 1) {
-                        formData.append('links', links[0]);
-                    } else if (links.length > 1) {
-                        formData.append('links', JSON.stringify(links));
-                    }
-                }
+                showTyping();
 
                 try {
-                    const response = await fetch(API_URL, {
+                    const payload = {
+                        model: modelSelect.value,
+                        message: message
+                    };
+                    if (conversationId) {
+                        payload.conversation_id = conversationId;
+                    }
+
+                    const res = await fetch(API_URL, {
                         method: 'POST',
-                        body: formData
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
                     });
 
-                    const data = await response.json();
+                    const data = await res.json();
 
-                    loader.style.display = 'none';
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate / Edit Image';
+                    hideTyping();
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
 
-                    if (data.success && data.url) {
-                        currentImageUrl = data.url;
-                        imagePreview.innerHTML = `<img src="${data.url}" alt="Generated Image" />`;
-                        modeBadge.textContent = `Mode: ${data.mode || 'Create'}`;
-                        resBadge.textContent = data.resolution || res;
-                        devCredit.textContent = data.dev || '⚡ Developer: Arif';
-
-                        const attitudeMsg = getAttitudeMessage(lang);
-                        const attitudeDiv = document.createElement('div');
-                        attitudeDiv.style.cssText =
-                            'background:#1fc7b008;border-left:3px solid #1fc7b0;padding:8px 14px;border-radius:10px;font-size:0.85rem;color:#b0d0d0;margin-top:6px;display:flex;align-items:center;gap:8px;';
-                        attitudeDiv.innerHTML = `<i class="fas fa-robot" style="color:#1fc7b0;"></i> ${attitudeMsg}`;
-                        const oldAttr = imagePreview.querySelector('.attitude-msg');
-                        if (oldAttr) oldAttr.remove();
-                        attitudeDiv.className = 'attitude-msg';
-                        imagePreview.appendChild(attitudeDiv);
-
-                        resultBox.classList.add('show');
+                    if (data.success && data.response) {
+                        if (data.conversation_id) {
+                            conversationId = data.conversation_id;
+                            convIdValue.textContent = conversationId;
+                        }
+                        let reply = data.response.replace(/\n/g, '<br>');
+                        addMessage(reply, 'bot');
                     } else {
-                        alert('Error: ' + (data.error || 'Unknown error occurred.'));
-                        resultBox.classList.remove('show');
+                        addMessage('⚠️ Error: ' + (data.error || 'Unknown error'), 'bot');
                     }
                 } catch (err) {
-                    loader.style.display = 'none';
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate / Edit Image';
-                    alert('Network error: ' + err.message);
-                    resultBox.classList.remove('show');
+                    hideTyping();
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
+                    addMessage('⚠️ Network error: ' + err.message, 'bot');
+                }
+            }
+
+            function clearChat() {
+                chatWindow.innerHTML = '';
+                const welcome = document.createElement('div');
+                welcome.className = 'msg bot';
+                welcome.innerHTML = '👋 Chat cleared. Ask a new question.<div class="time"><i class="far fa-clock"></i> Now</div>';
+                chatWindow.appendChild(welcome);
+                // conversationId রাখি – মেমোরি রিসেট করতে চাইলে নতুন চ্যাট বাটন ব্যবহার করবেন
+            }
+
+            function newChat() {
+                conversationId = null;
+                convIdValue.textContent = 'None';
+                chatWindow.innerHTML = '';
+                const welcome = document.createElement('div');
+                welcome.className = 'msg bot';
+                welcome.innerHTML = '🆕 New conversation started! Ask me anything.<div class="time"><i class="far fa-clock"></i> Now</div>';
+                chatWindow.appendChild(welcome);
+            }
+
+            sendBtn.addEventListener('click', sendMessage);
+            userInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
                 }
             });
+            clearBtn.addEventListener('click', clearChat);
+            newChatBtn.addEventListener('click', newChat);
 
-            downloadBtn.addEventListener('click', function() {
-                if (!currentImageUrl) return;
-                const a = document.createElement('a');
-                a.href = currentImageUrl;
-                a.download = 'cybertools_image.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            });
-
-            copyBtn.addEventListener('click', function() {
-                if (!currentImageUrl) return;
-                navigator.clipboard.writeText(currentImageUrl).then(() => {
-                    alert('Image URL copied to clipboard!');
-                }).catch(() => {
-                    const input = document.createElement('input');
-                    input.value = currentImageUrl;
-                    document.body.appendChild(input);
-                    input.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(input);
-                    alert('Image URL copied!');
-                });
-            });
-
-            console.log('✅ Cyber Tools Image Studio ready — using proxy');
+            console.log('✅ Cyber Tools DeepSeek Chat ready');
         })();
     </script>
 </body>
@@ -322,15 +266,15 @@ IMAGE_STUDIO_HTML = r'''
 # রুট – পেজ রেন্ডার
 # ============================================================
 @bp.route('/')
-def image_studio_page():
-    return render_template_string(IMAGE_STUDIO_HTML)
+def deepseek_page():
+    return render_template_string(DEEPSEEK_HTML)
 
 
 # ============================================================
-# প্রোক্সি এন্ডপয়েন্ট – NanoBanana API-তে কল করে CORS যোগ করে
+# চ্যাট API প্রোক্সি – DeepSeek API-তে কল করে CORS যোগ করে
 # ============================================================
-@bp.route('/image', methods=['POST', 'OPTIONS'])
-def image_proxy():
+@bp.route('/chat', methods=['POST', 'OPTIONS'])
+def chat_proxy():
     headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -341,25 +285,50 @@ def image_proxy():
         return ('', 200, headers)
 
     try:
-        form_data = request.form.to_dict()
-        api_url = 'https://zecora0.serv00.net/ai/NanoBanana.php'
+        data = request.get_json()
+        if not data or 'message' not in data:
+            return jsonify({'success': False, 'error': 'Message is required'}), 400, headers
+
+        model = data.get('model', '1')
+        message = data.get('message', '')
+        conversation_id = data.get('conversation_id', None)
+
+        api_url = 'https://zecora0.serv00.net/deepseek.php'
+
+        payload = {
+            'model': model,
+            'message': message
+        }
+        if conversation_id:
+            payload['conversation_id'] = conversation_id
+
+        req_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+        }
+
+        logger.info(f"Calling DeepSeek API with payload: {payload}")
         resp = requests.post(
             api_url,
-            data=form_data,
-            timeout=30,
-            headers={'User-Agent': 'CyberTools-Proxy/1.0'}
+            json=payload,
+            headers=req_headers,
+            timeout=30
         )
+
+        logger.info(f"DeepSeek response status: {resp.status_code}")
+        logger.info(f"DeepSeek response body: {resp.text[:500]}")
 
         try:
             result = resp.json()
         except:
-            result = {'success': False, 'error': 'Invalid response from API'}
-# আপনার ব্র্যান্ডিং যোগ করুন
-        if result.get('success') and result.get('url'):
+            result = {'success': False, 'error': 'Invalid JSON response from API'}
+ # আপনার ব্র্যান্ডিং যোগ করুন
+        if result.get('success'):
             result['dev'] = '🔥 Cyber Tools · Arif'
 
         return jsonify(result), resp.status_code, headers
 
     except Exception as e:
-        logger.error(f"Image proxy error: {str(e)[:100]}")
+        logger.error(f"DeepSeek proxy error: {str(e)[:100]}")
         return jsonify({'success': False, 'error': str(e)}), 500, headers
