@@ -85,11 +85,53 @@
         border: 1px solid rgba(255,255,255,0.06);
     }
 
-    .logout {
-        text-align: right;
-        margin-bottom: 16px;
+    /* ✅ হেডার – ব্যাক বাটন বামে, লগআউট ডানে */
+    .dashboard-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.06);
+        flex-wrap: wrap;
+        gap: 12px;
     }
-    .logout a {
+    .dashboard-header-top .left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .dashboard-header-top .right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    /* ব্যাক বাটন */
+    .btn-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0, 255, 255, 0.08);
+        padding: 8px 20px;
+        border-radius: 60px;
+        border: 1px solid rgba(0, 255, 255, 0.1);
+        color: #8ae6e6;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: 0.3s;
+        font-family: inherit;
+    }
+    .btn-back:hover {
+        background: rgba(0, 255, 255, 0.15);
+        border-color: rgba(0, 255, 255, 0.25);
+        color: #b0fff0;
+        transform: translateX(-4px);
+    }
+
+    /* লগআউট বাটন */
+    .btn-logout {
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -102,8 +144,9 @@
         font-weight: 600;
         text-decoration: none;
         transition: 0.3s;
+        font-family: inherit;
     }
-    .logout a:hover {
+    .btn-logout:hover {
         background: rgba(255, 50, 50, 0.2);
         border-color: #ff6a6a;
         box-shadow: 0 0 20px rgba(255, 50, 50, 0.1);
@@ -213,7 +256,6 @@
         box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
     }
 
-    /* লিংক ইউআরএল + কপি/প্রিভিউ */
     .link-url {
         font-family: 'Courier New', monospace;
         font-size: 0.85rem;
@@ -351,6 +393,7 @@
         .link-url { font-size: 0.7rem; padding: 4px 10px; }
         .btn-copy, .btn-preview { font-size: 0.65rem; padding: 4px 10px; }
         .link-card .link-meta { flex-direction: column; align-items: flex-start; }
+        .dashboard-header-top { flex-direction: row; justify-content: space-between; }
     }
     @media (max-width: 480px) {
         .brand { font-size: 1.3rem; }
@@ -358,6 +401,8 @@
         .dashboard-header { flex-direction: column; align-items: stretch; gap: 12px; }
         .btn-new { justify-content: center; }
         .link-url { white-space: normal; }
+        .dashboard-header-top { flex-direction: row; justify-content: space-between; gap: 8px; }
+        .btn-back, .btn-logout { font-size: 0.75rem; padding: 6px 14px; }
     }
 </style>
 </head>
@@ -365,16 +410,28 @@
 <div class="container">
     <div class="glass-card">
 
-        <div class="logout">
-            <a href="/phis/logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        <!-- ✅ টপ বার – ব্যাক বাটন বামে, লগআউট ডানে -->
+        <div class="dashboard-header-top">
+            <div class="left">
+                <a href="https://arifmolla123.github.io/Cybertools/vip-tools.html" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+            <div class="right">
+                <a href="/phis/logout" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
         </div>
 
+        <!-- ব্র্যান্ড -->
         <div class="brand">
             <i class="fas fa-shield-halved"></i>
             CYBER PHISH
             <small>v2.0</small>
         </div>
 
+        <!-- ড্যাশবোর্ড হেডার -->
         <div class="dashboard-header">
             <h2><i class="fas fa-user-astronaut"></i> Dashboard, {{ user }}</h2>
             <div class="user-tag"><i class="fas fa-circle" style="color:#00ffaa; font-size:0.6rem;"></i> Active</div>
