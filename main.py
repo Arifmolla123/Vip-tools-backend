@@ -10,7 +10,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')   # �
 init_db()   # ✅ /tmp/phish_data.db তৈরি হবে
 
 # ========== ব্লুপ্রিন্ট লোড ==========
-files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support']
+files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'image_studio']
 for file in files:
     module = importlib.import_module(file)
     if hasattr(module, 'bp'):
@@ -19,7 +19,7 @@ for file in files:
 # ========== হোম ও পিং ==========
 @app.route('/')
 def home():
-    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support']}
+    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support', 'image_studio']}
 
 @app.route('/ping')
 def ping():
