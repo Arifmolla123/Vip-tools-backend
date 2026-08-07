@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from flask import Blueprint, render_template_string, request, jsonify
 import requests
 import json
@@ -161,7 +162,7 @@ SUPPORT_HTML = r'''
         .msg.bot strong { color: #b0fff0; }
         .msg.bot ul { margin: 6px 0 6px 18px; padding-left: 6px; list-style-type: none; }
         .msg.bot ul li { position: relative; padding-left: 20px; margin-bottom: 4px; }
-        .msg.bot ul li::before { content: ""; position: absolute; left: 0; color: #1fc7b0; font-weight: bold; }
+        .msg.bot ul li::before { content: "▸"; position: absolute; left: 0; color: #1fc7b0; font-weight: bold; }
         .msg.bot .highlight { background: #1fc7b022; padding: 2px 10px; border-radius: 12px; border: 1px solid #1fc7b044; display: inline-block; }
         .msg .time {
             font-size: 0.6rem;
@@ -316,7 +317,7 @@ SUPPORT_HTML = r'''
             <div class="icon"><i class="fas fa-headset"></i></div>
             <div class="brand">
                 <h1>Cyber Tools</h1>
-                <span>Support � 24/7</span>
+                <span>Support · 24/7</span>
             </div>
         </div>
         <div class="header-right">
@@ -328,9 +329,9 @@ SUPPORT_HTML = r'''
     <!-- CHAT WINDOW -->
     <div class="chat-window" id="chatWindow">
         <div class="msg bot">
-            <div class="welcome-text"> Welcome to <strong>Cyber Tools Support</strong></div>
+            <div class="welcome-text">👋 Welcome to <strong>Cyber Tools Support</strong></div>
             Ask me about app features, VIP unlock, tools, groups, channels, or the developer.<br>
-            <span style="font-size:0.8rem;color:#5f8a88;">(Bengali, English, Hindi, Hinglish, Arabic, Urdu � all supported)</span>
+            <span style="font-size:0.8rem;color:#5f8a88;">(Bengali, English, Hindi, Hinglish, Arabic, Urdu – all supported)</span>
             <div class="time"><i class="far fa-clock"></i> Now</div>
         </div>
     </div>
@@ -363,59 +364,59 @@ SUPPORT_HTML = r'''
 
         var API_URL = '/support/chat';
 
-        // =====  (AI-  ) =====
+        // ===== ডকুমেন্টেশন (AI-কে দেওয়া হবে) =====
         var DOCUMENTATION = `
-=== CYBER TOOLS APP � COMPLETE GUIDE ===
+=== CYBER TOOLS APP – COMPLETE GUIDE ===
 
- HOME PAGE
-� Tools: Device Info, News Generator, Age Calculator, Day Finder, URL Shortener, QR Code Scan/Gen, Style Name/Text Generator, Free Host file.
-� Categories: Network, Security, Web, System.
-� Drawer: My Profile, VIP Menu, About Us, Contact, Share App.
-� Bottom Nav: Home, VIP Tools, Popular.
+🔹 HOME PAGE
+• Tools: Device Info, News Generator, Age Calculator, Day Finder, URL Shortener, QR Code Scan/Gen, Style Name/Text Generator, Free Host file.
+• Categories: Network, Security, Web, System.
+• Drawer: My Profile, VIP Menu, About Us, Contact, Share App.
+• Bottom Nav: Home, VIP Tools, Popular.
 
- VIP UNLOCK
-� Enter your registered Name and VIP Key.
-� VIP Key is pre-generated and stored in Firebase.
-� Users CANNOT generate keys themselves � they must contact the developer.
-� To get a VIP Key, contact developer Arif via WhatsApp or Telegram.
-� On success  localStorage vip_status = 'active'
-� VIP expiry: lifetime or specific date.
+🔹 VIP UNLOCK
+• Enter your registered Name and VIP Key.
+• VIP Key is pre-generated and stored in Firebase.
+• Users CANNOT generate keys themselves – they must contact the developer.
+• To get a VIP Key, contact developer Arif via WhatsApp or Telegram.
+• On success → localStorage vip_status = 'active'
+• VIP expiry: lifetime or specific date.
 
- VIP TOOLS
-� Premium Apps, IP Tracker, Cyber bomber, Cyber Phish, Telegram Tracker, Cyber SPY.
-� If not VIP  shows "Access Denied" popup and redirects to vip.html.
+🔹 VIP TOOLS
+• Premium Apps, IP Tracker, Cyber bomber, Cyber Phish, Telegram Tracker, Cyber SPY.
+• If not VIP → shows "Access Denied" popup and redirects to vip.html.
 
- SETTINGS
-� View your VIP credentials.
-� Delete account  stores in deleted_accounts with expiry. Only admin (Arif) can reactivate.
+🔹 SETTINGS
+• View your VIP credentials.
+• Delete account → stores in deleted_accounts with expiry. Only admin (Arif) can reactivate.
 
- SHARE APP
-� This page is already inside the app. Users do NOT need an external download link.
-� If user asks for download link, tell them they are already inside the app.
+🔹 SHARE APP
+• This page is already inside the app. Users do NOT need an external download link.
+• If user asks for download link, tell them they are already inside the app.
 
- JOIN COMMUNITY
-� WhatsApp Group: https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME
-� YouTube Channel: https://youtube.com/@hackingcyber-q4s
-� These are official community channels for support, updates, and tutorials.
+🔹 JOIN COMMUNITY
+• WhatsApp Group: https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME
+• YouTube Channel: https://youtube.com/@hackingcyber-q4s
+• These are official community channels for support, updates, and tutorials.
 
- DEVELOPER INFO
-� Name: Arif
-� Title: System Creator & Admin
-� Bio: Hello! I am Arif. A passionate technology enthusiast and full-stack developer. I specialize in cybersecurity, modern web architectures, and custom application development.
-� Skills: Ethical Hacking, Web Designer, App Development, Video Editor
-� Security Signature: ARIF
+🔹 DEVELOPER INFO
+• Name: Arif
+• Title: System Creator & Admin
+• Bio: Hello! I am Arif. A passionate technology enthusiast and full-stack developer. I specialize in cybersecurity, modern web architectures, and custom application development.
+• Skills: Ethical Hacking, Web Designer, App Development, Video Editor
+• Security Signature: ARIF
 
- SUPPORT
-� There is NO support team. Only the developer Arif handles everything.
+🔹 SUPPORT
+• There is NO support team. Only the developer Arif handles everything.
         `;
 
         var isTyping = false;
 
-        // =====   =====
+        // ===== ভাষা ডিটেক্ট =====
         function detectLanguage(text) {
-            if (/[\u0980-\u09FF]/.test(text)) return '';
-            if (/[\u0900-\u097F]/.test(text)) return '';
-            if (/[\u0600-\u06FF]/.test(text)) return '/';
+            if (/[\u0980-\u09FF]/.test(text)) return 'বাংলা';
+            if (/[\u0900-\u097F]/.test(text)) return 'हिन्दी';
+            if (/[\u0600-\u06FF]/.test(text)) return 'العربية/اردو';
             var hinglishWords = ['kya', 'hai', 'nahi', 'aap', 'hum', 'tum', 'main', 'kaise', 'kyon', 'ho', 'hain', 'tha', 'thi', 'the', 'raha', 'rahi', 'rahe', 'sakta', 'sakti', 'sakte', 'chahiye', 'mil', 'de', 'le', 'kar', 'ko', 'se', 'mein', 'pe', 'ki', 'ka', 'ke', 'ne', 'bhi', 'hi', 'to', 'nahi', 'haan', 'ji', 'sir', 'madam', 'apka', 'apko', 'mera', 'tera', 'uska', 'unki', 'inke', 'jiska', 'jiski'];
             var words = text.toLowerCase().split(/\\s+/);
             var hinglishScore = 0;
@@ -427,7 +428,7 @@ SUPPORT_HTML = r'''
             return 'English';
         }
 
-        // =====   =====
+        // ===== মেসেজ যোগ =====
         function addMessage(text, sender, time) {
             if (!time) time = new Date();
             var div = document.createElement('div');
@@ -441,7 +442,7 @@ SUPPORT_HTML = r'''
             return div;
         }
 
-        // =====   =====
+        // ===== টাইপিং ইন্ডিকেটর =====
         function showTyping() {
             if (isTyping) return;
             isTyping = true;
@@ -458,35 +459,35 @@ SUPPORT_HTML = r'''
             isTyping = false;
         }
 
-        // =====   (API  ) =====
+        // ===== স্ট্যাটিক উত্তর (API ফেইল করলে) =====
         function getStaticAnswer(question) {
             var q = question.toLowerCase();
             if (q.indexOf('vip') !== -1 || q.indexOf('key') !== -1 || q.indexOf('unlock') !== -1) {
-                return " VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram.";
+                return "🔑 VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram.";
             }
             if (q.indexOf('group') !== -1 || q.indexOf('channel') !== -1 || q.indexOf('community') !== -1) {
-                return " You can join our WhatsApp Group (https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME) or YouTube Channel (https://youtube.com/@hackingcyber-q4s).";
+                return "📢 You can join our WhatsApp Group (https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME) or YouTube Channel (https://youtube.com/@hackingcyber-q4s).";
             }
             if (q.indexOf('developer') !== -1 || q.indexOf('arif') !== -1 || q.indexOf('who made') !== -1) {
-                return " The app is developed by Arif. He is a full-stack developer specializing in cybersecurity and app development.";
+                return "👨‍💻 The app is developed by Arif. He is a full-stack developer specializing in cybersecurity and app development.";
             }
             if (q.indexOf('tool') !== -1 || q.indexOf('feature') !== -1) {
-                return " Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more.";
+                return "🛠️ Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more.";
             }
             if (q.indexOf('download') !== -1 || q.indexOf('apk') !== -1) {
-                return " You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu.";
+                return "📱 You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu.";
             }
-            return " I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer.";
+            return "🤖 I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer.";
         }
 
-          // ===== AI   =====
+        // ===== AI রেসপন্স ফেচ =====
         async function getAIResponse(question) {
             var prompt = `
 You are the "Cyber Tools" support agent. You must follow these rules strictly:
 
 1. **Answer in the SAME language** the user used. Detect language from user's question.
 2. **Format your response beautifully**:
-   - Use bullet points (� or -) for lists.
+   - Use bullet points (• or -) for lists.
    - Keep paragraphs short and separated by blank lines.
    - Use emojis where appropriate (but not too many).
    - Use **bold** for important terms or headings.
@@ -513,7 +514,7 @@ User question: ${question}
             return data.reply;
         }
 
-        // =====   =====
+ // ===== হ্যান্ডেল সেন্ড =====
         async function handleSend() {
             var question = userInput.value.trim();
             if (!question) return;
@@ -534,14 +535,14 @@ User question: ${question}
                 var formatted = reply
                     .replace(/\\n/g, '<br>')
                     .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
-                    .replace(/^� /gm, '� ')
-                    .replace(/^- /gm, '� ')
+                    .replace(/^• /gm, '• ')
+                    .replace(/^- /gm, '• ')
                     .replace(/^\\d+\\. /gm, function(m) { return '<br>' + m; });
                 addMessage(formatted, 'bot');
             } catch (err) {
                 hideTyping();
                 var staticReply = getStaticAnswer(question);
-                var msg = ' AI service is currently offline. Showing offline reply.<br><br>' + staticReply;
+                var msg = '⚠️ AI service is currently offline. Showing offline reply.<br><br>' + staticReply;
                 addMessage(msg, 'bot');
                 console.error('API Error:', err);
             } finally {
@@ -550,30 +551,17 @@ User question: ${question}
             }
         }
 
-        // =====   =====
+        // ===== ক্লিয়ার চ্যাট =====
         function clearChat() {
             chatWindow.innerHTML = '';
             var welcome = document.createElement('div');
             welcome.className = 'msg bot';
-            welcome.innerHTML = ' Chat cleared. Ask a new question.<div class="time"><i class="far fa-clock"></i> Now</div>';
+            welcome.innerHTML = '👋 Chat cleared. Ask a new question.<div class="time"><i class="far fa-clock"></i> Now</div>';
             chatWindow.appendChild(welcome);
             langLabel.textContent = 'English';
         }
 
-        // =====     (    ) =====
-        window.addEventListener('beforeunload', function() {
-            //    �    DOM  ,    
-            //       
-        });
-
-        // =====      =====
-        window.addEventListener('load', function() {
-            //    ,    
-            //         
-            //   
-        });
-
-        // =====   =====
+        // ===== ইভেন্ট লিসেনার =====
         sendBtn.addEventListener('click', handleSend);
         userInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -583,7 +571,7 @@ User question: ${question}
         });
         clearBtn.addEventListener('click', clearChat);
 
-        // =====   =====
+        // ===== ফুটার লিংক =====
         document.getElementById('whatsappLink').addEventListener('click', function(e) {
             e.preventDefault();
             window.open('https://wa.me/917865875762?text=Support+needed', '_blank');
@@ -593,7 +581,7 @@ User question: ${question}
             window.open('https://t.me/your_support', '_blank');
         });
 
-        console.log(' Cyber Tools Support ready (Flask backend)');
+        console.log('✅ Cyber Tools Support ready (Flask backend)');
     })();
 </script>
 </body>
@@ -634,14 +622,14 @@ def call_ai_api(prompt):
                 result = resp.json()
                 reply = result.get('reply') or result.get('response')
                 if reply:
-                    logger.info(" KILWA API success")
+                    logger.info("✅ KILWA API success")
                     return reply
                 else:
                     logger.warning(f"KILWA returned no reply: {result}")
             except json.JSONDecodeError:
                 text = resp.text.strip()
                 if text:
-                    logger.info(" KILWA returned text")
+                    logger.info("✅ KILWA returned text")
                     return text
     except Exception as e:
         logger.error(f"KILWA API error: {str(e)[:100]}")
@@ -653,13 +641,13 @@ def call_ai_api(prompt):
 def get_static_answer(question):
     q = question.lower()
     if 'vip' in q or 'key' in q or 'unlock' in q:
-        return " VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram."
+        return "🔑 VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram."
     if 'group' in q or 'channel' in q or 'community' in q:
-        return " You can join our WhatsApp Group (https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME) or YouTube Channel (https://youtube.com/@hackingcyber-q4s)."
+        return "📢 You can join our WhatsApp Group (https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME) or YouTube Channel (https://youtube.com/@hackingcyber-q4s)."
     if 'developer' in q or 'arif' in q or 'who made' in q:
-        return " The app is developed by Arif. He is a full-stack developer specializing in cybersecurity and app development."
+        return "👨‍💻 The app is developed by Arif. He is a full-stack developer specializing in cybersecurity and app development."
     if 'tool' in q or 'feature' in q:
-        return " Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more."
+        return "🛠️ Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more."
     if 'download' in q or 'apk' in q:
-        return " You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu."
-    return " I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer."
+        return "📱 You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu."
+    return "🤖 I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer."
