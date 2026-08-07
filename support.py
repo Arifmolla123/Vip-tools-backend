@@ -98,24 +98,6 @@ SUPPORT_HTML = r'''
             gap: 6px;
         }
         .lang-indicator i { color: #1fc7b0; }
-        .btn-back {
-            background: #1a2e3e;
-            border: none;
-            color: #b0d0d0;
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: 0.2s;
-            text-decoration: none;
-        }
-        .btn-back:hover {
-            background: #2a4a5a;
-            color: #ffffff;
-        }
         .chat-window {
             background: #0a121e;
             border-radius: 24px;
@@ -293,20 +275,6 @@ SUPPORT_HTML = r'''
             color: #b0d0d0;
             margin-bottom: 4px;
         }
-        .clear-btn {
-            background: transparent;
-            border: none;
-            color: #5f8a88;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: 0.2s;
-            padding: 4px 10px;
-            border-radius: 20px;
-        }
-        .clear-btn:hover {
-            color: #ff6b6b;
-            background: #2d0f1a33;
-        }
     </style>
 </head>
 <body>
@@ -322,7 +290,6 @@ SUPPORT_HTML = r'''
         </div>
         <div class="header-right">
             <span class="lang-indicator"><i class="fas fa-globe"></i> <span id="langLabel">English</span></span>
-            <a href="/" class="btn-back" id="backBtn"><i class="fas fa-arrow-left"></i> Home</a>
         </div>
     </div>
 
@@ -481,20 +448,33 @@ SUPPORT_HTML = r'''
         }
 
         // ===== AI রেসপন্স ফেচ =====
-        async function getAIResponse(question) {
+        async function getAIResponse(question, detectedLang) {
             var prompt = `
 You are the "Cyber Tools" support agent. You must follow these rules strictly:
 
-1. **Answer in the SAME language** the user used. Detect language from user's question.
-2. **Format your response beautifully**:
-   - Use bullet points (• or -) for lists.
-   - Keep paragraphs short and separated by blank lines.
-   - Use emojis where appropriate (but not too many).
-   - Use **bold** for important terms or headings.
-   - For multi-step guides, number them (1. 2. 3.).
-3. **Never** include any disclaimers like "I am an AI", "as an AI", "I can't", etc.
-4. **If user asks about hacking/illegal stuff**: politely say you only assist with app features.
-5. **Use this documentation** for all answers:
+1. **CRITICAL: Reply EXACTLY in the same language as the user's question.**
+   Detected language of user: ${detectedLang}.
+   If user wrote in Bengali, reply in Bengali.
+   If user wrote in Hindi, reply in Hindi.
+   If user wrote in Hinglish (Hindi written with Latin script), reply in Hinglish.
+   If user wrote in English, reply in English.
+   If user wrote in Arabic/Urdu, reply in that language.
+   NEVER switch language.
+
+2. **Format your response beautifully and cleanly**:
+   - Use plain text, NOT markdown.
+   - Do NOT use ** or # or __ or any markdown symbols.
+   - Use bullet points like "• " for lists.
+   - Use blank lines between paragraphs.
+   - Use simple bolding by surrounding important words with ** (I will convert them to bold), but try to avoid excessive bolding.
+   - Keep paragraphs short.
+   - Use emojis sparingly and appropriately (e.g., 📱, 🔑, 👨‍💻).
+
+3. **Never** include disclaimers like "I am an AI", "as an AI", "I can't", etc.
+
+4. **If user asks about hacking or illegal activities**: politely say you only assist with app features.
+
+5. **Use this documentation** for all answers about the app:
 ${DOCUMENTATION}
 
 User question: ${question}
@@ -514,7 +494,7 @@ User question: ${question}
             return data.reply;
         }
 
- // ===== হ্যান্ডেল সেন্ড =====
+         // ===== হ্যান্ডেল সেন্ড =====
         async function handleSend() {
             var question = userInput.value.trim();
             if (!question) return;
@@ -530,14 +510,16 @@ User question: ${question}
             showTyping();
 
             try {
-                var reply = await getAIResponse(question);
+                var reply = await getAIResponse(question, lang);
                 hideTyping();
+                // Clean up any stray markdown: remove # headers (convert to bold), remove ** if present, but we already told AI not to use them
                 var formatted = reply
                     .replace(/\\n/g, '<br>')
-                    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
-                    .replace(/^• /gm, '• ')
+                    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>') // keep bold
+                    .replace(/^#+\\s*/gm, '') // remove heading hashes
+                    .replace(/^• /gm, '• ') // ensure bullet points
                     .replace(/^- /gm, '• ')
-                    .replace(/^\\d+\\. /gm, function(m) { return '<br>' + m; });
+                    .replace(/^\\d+\\. /gm, function(m) { return '<br>' + m; }); // number lists
                 addMessage(formatted, 'bot');
             } catch (err) {
                 hideTyping();
