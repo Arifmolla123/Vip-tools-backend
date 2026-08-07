@@ -7,7 +7,6 @@ import urllib.parse
 
 bp = Blueprint('support', __name__, url_prefix='/support')
 
-# লগিং – Render-এর লগে দেখতে
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -309,7 +308,7 @@ def support_page():
 
 
 # =============================================================
-# ব্যাকেন্ড AI কল – একাধিক পদ্ধতি চেষ্টা করবে
+# ব্যাকেন্ড AI কল – নতুন এন্ডপয়েন্ট ব্যবহার
 # =============================================================
 @bp.route('/chat', methods=['POST'])
 def chat():
@@ -318,55 +317,66 @@ def chat():
         return jsonify({'error': 'No question provided'}), 400
 
     question = data['question']
-
-    # API কল করার চেষ্টা – বিভিন্ন পদ্ধতি
     reply = call_ai_api(question)
     return jsonify({'reply': reply})
 
 
 def call_ai_api(prompt):
     """
-    একাধিক এন্ডপয়েন্ট ও মেথড ট্রাই করবে
+    একটি ফ্রি ওপেন-সোর্স API ব্যবহার করছি যা Render থেকে অ্যাক্সেসযোগ্য
     """
-    # এন্ডপয়েন্ট লিস্ট
-    endpoints = [
-        'https://de3.bot-hosting.net:21007/kilwa-claude',
-        'https://de3.bot-hosting.net:21007/kilwa-claude',
-    ]
+    # নতুন API – এটি অনেক ডেভেলপার ব্যবহার করে, CORS-মুক্ত
+    endpoint = 'https://api.weijia.workers.dev/'
 
-    methods = [
-        ('POST', lambda u, p: requests.post(u, json={'text': p}, timeout=15, verify=False, headers={'User-Agent': 'CyberTools/1.0'})),
-        ('GET', lambda u, p: requests.get(u + '?text=' + urllib.parse.quote(p), timeout=15, verify=False, headers={'User-Agent': 'CyberTools/1.0'})),
-    ]
+    try:
+        logger.info(f"Calling Weijia API: {endpoint}")
+        resp = requests.post(
+            endpoint,
+            json={'text': prompt},
+            timeout=20,
+            verify=False,
+            headers={'User-Agent': 'CyberTools-Support/1.0', 'Content-Type': 'application/json'}
+        )
+        logger.info(f"Weijia API status: {resp.status_code}")
 
-    for idx, endpoint in enumerate(endpoints):
-        for method_name, method_func in methods:
+        if resp.status_code == 200:
             try:
-                logger.info(f"Trying {method_name} {endpoint}")
-                resp = method_func(endpoint, prompt)
-                logger.info(f"Status: {resp.status_code}")
-
-                if resp.status_code == 200:
-                    try:
-                        result = resp.json()
-                        reply = result.get('reply') or result.get('response') or result.get('text') or result.get('message')
-                        if reply:
-                            logger.info(f"✅ Success from {method_name} {endpoint}")
-                            return reply
-                        else:
-                            logger.warning(f"No reply field in JSON: {result}")
-                    except json.JSONDecodeError:
-                        # টেক্সট রেসপন্স
-                        text = resp.text.strip()
-                        if text:
-                            logger.info(f"✅ Success (text) from {method_name} {endpoint}")
-                            return text
+                result = resp.json()
+                # বিভিন্ন রেসপন্স ফরম্যাট চেক
+                reply = result.get('reply') or result.get('response') or result.get('text') or result.get('message')
+                if reply:
+                    logger.info("✅ Weijia API success")
+                    return reply
                 else:
-                    logger.warning(f"HTTP {resp.status_code} from {method_name} {endpoint}")
-                    logger.warning(f"Response: {resp.text[:200]}")
-            except Exception as e:
-                logger.error(f"Error on {method_name} {endpoint}: {str(e)[:100]}")
-                continue
+                    logger.warning(f"Weijia returned JSON without reply: {result}")
+            except json.JSONDecodeError:
+                # টেক্সট রেসপন্স
+                text = resp.text.strip()
+                if text:
+                    logger.info("✅ Weijia API returned text")
+                    return text
+
+    except Exception as e:
+        logger.error(f"Weijia API error: {str(e)[:100]}")
+  # যদি Weijia ব্যর্থ হয়, তাহলে অন্য একটি ফ্রি API চেষ্টা
+    try:
+        backup_endpoint = 'https://api.popcat.xyz/chat'
+        logger.info(f"Trying backup API: {backup_endpoint}")
+        resp = requests.get(
+            backup_endpoint,
+            params={'msg': prompt},
+            timeout=20,
+            verify=False,
+            headers={'User-Agent': 'CyberTools-Support/1.0'}
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            reply = data.get('response') or data.get('reply')
+            if reply:
+                logger.info("✅ Backup API success")
+                return reply
+    except Exception as e:
+        logger.error(f"Backup API error: {str(e)[:100]}")
 
     # সব ব্যর্থ – স্ট্যাটিক উত্তর
     logger.error("All API attempts failed. Falling back to static.")
