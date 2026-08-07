@@ -3,10 +3,11 @@ import requests
 import json
 import time
 import logging
+import urllib.parse
 
 bp = Blueprint('support', __name__, url_prefix='/support')
 
-# লগ সেটআপ (Render-এর লগে দেখতে)
+# লগিং – Render-এর লগে দেখতে
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -306,8 +307,9 @@ SUPPORT_HTML = r'''
 def support_page():
     return render_template_string(SUPPORT_HTML)
 
+
 # =============================================================
-# চ্যাট API – একাধিক এন্ডপয়েন্ট চেষ্টা করবে
+# ব্যাকেন্ড AI কল – একাধিক পদ্ধতি চেষ্টা করবে
 # =============================================================
 @bp.route('/chat', methods=['POST'])
 def chat():
@@ -317,54 +319,58 @@ def chat():
 
     question = data['question']
 
-    # বাহ্যিক API এন্ডপয়েন্টগুলোর লিস্ট (প্রথমটা মূল, বাকিগুলো ব্যাকআপ)
+    # API কল করার চেষ্টা – বিভিন্ন পদ্ধতি
+    reply = call_ai_api(question)
+    return jsonify({'reply': reply})
+
+
+def call_ai_api(prompt):
+    """
+    একাধিক এন্ডপয়েন্ট ও মেথড ট্রাই করবে
+    """
+    # এন্ডপয়েন্ট লিস্ট
     endpoints = [
         'https://de3.bot-hosting.net:21007/kilwa-claude',
-        'https://de3.bot-hosting.net:21007/kilwa-claude',  # একই, কিন্তু ক্যাশ এড়াতে আলাদা প্যারামিটার যোগ করব
+        'https://de3.bot-hosting.net:21007/kilwa-claude',
     ]
 
-    last_error = None
+    methods = [
+        ('POST', lambda u, p: requests.post(u, json={'text': p}, timeout=15, verify=False, headers={'User-Agent': 'CyberTools/1.0'})),
+        ('GET', lambda u, p: requests.get(u + '?text=' + urllib.parse.quote(p), timeout=15, verify=False, headers={'User-Agent': 'CyberTools/1.0'})),
+    ]
+
     for idx, endpoint in enumerate(endpoints):
-        try:
-            # প্রতিবার আলাদা ক্যাশ বাস্টার
-            url = endpoint + ('?t=' + str(int(time.time() * 1000)) if idx == 0 else '?t=' + str(int(time.time() * 1000) + idx))
-            logger.info(f"Trying endpoint: {url}")
+        for method_name, method_func in methods:
+            try:
+                logger.info(f"Trying {method_name} {endpoint}")
+                resp = method_func(endpoint, prompt)
+                logger.info(f"Status: {resp.status_code}")
 
-            resp = requests.post(
-                url,
-                json={'text': question},
-                timeout=15,  # টাইমআউট বাড়ালাম
-                headers={'Content-Type': 'application/json', 'User-Agent': 'CyberTools-Support/1.0'},
-                verify=False  # SSL যাচাই বন্ধ (যদি সেলফ-সাইনেড সার্টিফিকেট থাকে)
-            )
-
-            if resp.status_code == 200:
-                result = resp.json()
-                reply = result.get('reply') or result.get('response') or result.get('text') or 'No reply field found'
-                logger.info(f"Success from endpoint {idx}")
-                return jsonify({'reply': reply})
-            else:
-                logger.warning(f"Endpoint {idx} returned {resp.status_code}: {resp.text[:100]}")
-                last_error = f"HTTP {resp.status_code}"
+                if resp.status_code == 200:
+                    try:
+                        result = resp.json()
+                        reply = result.get('reply') or result.get('response') or result.get('text') or result.get('message')
+                        if reply:
+                            logger.info(f"✅ Success from {method_name} {endpoint}")
+                            return reply
+                        else:
+                            logger.warning(f"No reply field in JSON: {result}")
+                    except json.JSONDecodeError:
+                        # টেক্সট রেসপন্স
+                        text = resp.text.strip()
+                        if text:
+                            logger.info(f"✅ Success (text) from {method_name} {endpoint}")
+                            return text
+                else:
+                    logger.warning(f"HTTP {resp.status_code} from {method_name} {endpoint}")
+                    logger.warning(f"Response: {resp.text[:200]}")
+            except Exception as e:
+                logger.error(f"Error on {method_name} {endpoint}: {str(e)[:100]}")
                 continue
 
-        except requests.exceptions.Timeout:
-            logger.warning(f"Endpoint {idx} timed out")
-            last_error = "Timeout"
-            continue
-        except requests.exceptions.ConnectionError as e:
-            logger.warning(f"Endpoint {idx} connection error: {str(e)[:80]}")
-            last_error = "Connection error"
-            continue
-        except Exception as e:
-            logger.warning(f"Endpoint {idx} error: {str(e)[:80]}")
-            last_error = str(e)
-            continue
-
-    # সব এন্ডপয়েন্ট ব্যর্থ – স্ট্যাটিক উত্তর
-    logger.error(f"All endpoints failed. Last error: {last_error}")
-    static = get_static_answer(question)
-    return jsonify({'reply': static})
+    # সব ব্যর্থ – স্ট্যাটিক উত্তর
+    logger.error("All API attempts failed. Falling back to static.")
+    return get_static_answer(prompt)
 
 
 def get_static_answer(question):
