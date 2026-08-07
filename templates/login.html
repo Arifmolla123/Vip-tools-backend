@@ -18,12 +18,14 @@
 <body>
 <div class="container"><div class="glass-card" style="max-width:500px;margin:auto;">
 <div class="brand">🔐 CYBER PHISH</div><h2>Login</h2>
-<form method="post">
+<form method="post" action="/phis/login">   <!-- ✅ অ্যাকশন যোগ করা হয়েছে -->
     <input type="text" name="username" placeholder="Username" required>
     <input type="password" name="password" placeholder="Password" required>
     <button type="submit">Login</button>
 </form>
-<div style="text-align:center;margin-top:20px;"><a href="/register">Create new account</a></div>
+<div style="text-align:center;margin-top:20px;">
+    <a href="/phis/register">Create new account</a>   <!-- ✅ লিংক ঠিক করা -->
+</div>
 </div></div>
 </body>
 </html>
