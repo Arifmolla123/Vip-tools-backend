@@ -86,8 +86,9 @@ def login():
             session['username'] = username
             return redirect('/phis/dashboard')
         else:
-            return "Invalid credentials. <a href='/phis/login'>Try again</a>"
-    return render_template('login.html')
+            # ❌ এরর মেসেজ টেমপ্লেটে পাঠানো হচ্ছে
+            return render_template('login.html', error="Invalid username or password. Please try again.")
+    return render_template('login.html', error=None)
 
 # ==================== লগআউট ====================
 @bp.route('/logout')
