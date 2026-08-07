@@ -2,8 +2,13 @@ from flask import Blueprint, render_template_string, request, jsonify
 import requests
 import json
 import time
+import logging
 
 bp = Blueprint('support', __name__, url_prefix='/support')
+
+# লগ সেটআপ (Render-এর লগে দেখতে)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 SUPPORT_HTML = r'''
 <!DOCTYPE html>
@@ -254,7 +259,7 @@ SUPPORT_HTML = r'''
             } catch (err) {
                 hideTyping();
                 var staticReply = getStaticAnswer(question);
-                var msg = '⚠️ Service offline – showing offline reply.\\n\\n' + staticReply;
+                var msg = '⚠️ AI service is currently offline. Showing offline reply.\\n\\n' + staticReply;
                 addMessage(msg, 'bot');
                 console.error('API Error:', err);
             } finally {
@@ -301,6 +306,9 @@ SUPPORT_HTML = r'''
 def support_page():
     return render_template_string(SUPPORT_HTML)
 
+# =============================================================
+# চ্যাট API – একাধিক এন্ডপয়েন্ট চেষ্টা করবে
+# =============================================================
 @bp.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
@@ -309,24 +317,55 @@ def chat():
 
     question = data['question']
 
-    try:
-        external_api = 'https://de3.bot-hosting.net:21007/kilwa-claude'
-        resp = requests.post(
-            external_api,
-            json={'text': question},
-            timeout=10,
-            headers={'Content-Type': 'application/json'}
-        )
-        if resp.status_code == 200:
-            result = resp.json()
-            reply = result.get('reply') or result.get('response') or 'No reply'
-            return jsonify({'reply': reply})
-        else:
-            static = get_static_answer(question)
-            return jsonify({'reply': static})
-    except Exception as e:
-        static = get_static_answer(question)
-        return jsonify({'reply': static})
+    # বাহ্যিক API এন্ডপয়েন্টগুলোর লিস্ট (প্রথমটা মূল, বাকিগুলো ব্যাকআপ)
+    endpoints = [
+        'https://de3.bot-hosting.net:21007/kilwa-claude',
+        'https://de3.bot-hosting.net:21007/kilwa-claude',  # একই, কিন্তু ক্যাশ এড়াতে আলাদা প্যারামিটার যোগ করব
+    ]
+
+    last_error = None
+    for idx, endpoint in enumerate(endpoints):
+        try:
+            # প্রতিবার আলাদা ক্যাশ বাস্টার
+            url = endpoint + ('?t=' + str(int(time.time() * 1000)) if idx == 0 else '?t=' + str(int(time.time() * 1000) + idx))
+            logger.info(f"Trying endpoint: {url}")
+
+            resp = requests.post(
+                url,
+                json={'text': question},
+                timeout=15,  # টাইমআউট বাড়ালাম
+                headers={'Content-Type': 'application/json', 'User-Agent': 'CyberTools-Support/1.0'},
+                verify=False  # SSL যাচাই বন্ধ (যদি সেলফ-সাইনেড সার্টিফিকেট থাকে)
+            )
+
+            if resp.status_code == 200:
+                result = resp.json()
+                reply = result.get('reply') or result.get('response') or result.get('text') or 'No reply field found'
+                logger.info(f"Success from endpoint {idx}")
+                return jsonify({'reply': reply})
+            else:
+                logger.warning(f"Endpoint {idx} returned {resp.status_code}: {resp.text[:100]}")
+                last_error = f"HTTP {resp.status_code}"
+                continue
+
+        except requests.exceptions.Timeout:
+            logger.warning(f"Endpoint {idx} timed out")
+            last_error = "Timeout"
+            continue
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"Endpoint {idx} connection error: {str(e)[:80]}")
+            last_error = "Connection error"
+            continue
+        except Exception as e:
+            logger.warning(f"Endpoint {idx} error: {str(e)[:80]}")
+            last_error = str(e)
+            continue
+
+    # সব এন্ডপয়েন্ট ব্যর্থ – স্ট্যাটিক উত্তর
+    logger.error(f"All endpoints failed. Last error: {last_error}")
+    static = get_static_answer(question)
+    return jsonify({'reply': static})
+
 
 def get_static_answer(question):
     q = question.lower()
