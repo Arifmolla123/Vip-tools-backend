@@ -5,10 +5,7 @@ import time
 
 bp = Blueprint('support', __name__, url_prefix='/support')
 
-# ===================================================================
-# HTML টেমপ্লেট (support.html-এর সম্পূর্ণ কোড)
-# ===================================================================
-SUPPORT_HTML = '''
+SUPPORT_HTML = r'''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,17 +95,15 @@ SUPPORT_HTML = '''
     (function() {
         "use strict";
 
-        const chatWindow = document.getElementById('chatWindow');
-        const userInput = document.getElementById('userInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const langLabel = document.getElementById('langLabel');
+        var chatWindow = document.getElementById('chatWindow');
+        var userInput = document.getElementById('userInput');
+        var sendBtn = document.getElementById('sendBtn');
+        var clearBtn = document.getElementById('clearBtn');
+        var langLabel = document.getElementById('langLabel');
 
-        // ===== ব্যাকেন্ড এন্ডপয়েন্ট (আমাদের Flask সার্ভার) =====
-        const API_URL = '/support/chat';
+        var API_URL = '/support/chat';
 
-        // ===== ডকুমেন্টেশন =====
-        const DOCUMENTATION = `
+        var DOCUMENTATION = `
 === CYBER TOOLS APP – COMPLETE GUIDE ===
 
 🔹 HOME PAGE (index.html)
@@ -153,29 +148,31 @@ SUPPORT_HTML = '''
 • There is NO support team. Only the developer Arif handles everything.
         `;
 
-        let isTyping = false;
+        var isTyping = false;
 
         function detectLanguage(text) {
-            if (/[\\u0980-\\u09FF]/.test(text)) return 'বাংলা';
-            if (/[\\u0900-\\u097F]/.test(text)) return 'हिन्दी';
-            if (/[\\u0600-\\u06FF]/.test(text)) return 'العربية/اردو';
-            const hinglishWords = ['kya', 'hai', 'nahi', 'aap', 'hum', 'tum', 'main', 'kaise', 'kyon', 'ho', 'hain', 'tha', 'thi', 'the', 'raha', 'rahi', 'rahe', 'sakta', 'sakti', 'sakte', 'chahiye', 'mil', 'de', 'le', 'kar', 'ko', 'se', 'mein', 'pe', 'ki', 'ka', 'ke', 'ne', 'bhi', 'hi', 'to', 'nahi', 'haan', 'ji', 'sir', 'madam', 'apka', 'apko', 'mera', 'tera', 'uska', 'unki', 'inke', 'jiska', 'jiski'];
-            const words = text.toLowerCase().split(/\\s+/);
-            let hinglishScore = 0;
-            for (let w of words) {
-                w = w.replace(/[^a-z]/g, '');
-                if (hinglishWords.includes(w)) hinglishScore++;
+            if (/[\u0980-\u09FF]/.test(text)) return 'বাংলা';
+            if (/[\u0900-\u097F]/.test(text)) return 'हिन्दी';
+            if (/[\u0600-\u06FF]/.test(text)) return 'العربية/اردو';
+            var hinglishWords = ['kya', 'hai', 'nahi', 'aap', 'hum', 'tum', 'main', 'kaise', 'kyon', 'ho', 'hain', 'tha', 'thi', 'the', 'raha', 'rahi', 'rahe', 'sakta', 'sakti', 'sakte', 'chahiye', 'mil', 'de', 'le', 'kar', 'ko', 'se', 'mein', 'pe', 'ki', 'ka', 'ke', 'ne', 'bhi', 'hi', 'to', 'nahi', 'haan', 'ji', 'sir', 'madam', 'apka', 'apko', 'mera', 'tera', 'uska', 'unki', 'inke', 'jiska', 'jiski'];
+            var words = text.toLowerCase().split(/\\s+/);
+            var hinglishScore = 0;
+            for (var i = 0; i < words.length; i++) {
+                var w = words[i].replace(/[^a-z]/g, '');
+                if (hinglishWords.indexOf(w) !== -1) hinglishScore++;
             }
             if (hinglishScore >= 2) return 'Hinglish';
             return 'English';
         }
 
-        function addMessage(text, sender, time = null) {
-            const div = document.createElement('div');
-            div.className = `msg ${sender}`;
-            const now = time || new Date();
-            const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-            div.innerHTML = text + `<div class="time"><i class="far fa-clock"></i> ${timeStr}</div>`;
+        function addMessage(text, sender, time) {
+            if (!time) time = new Date();
+            var div = document.createElement('div');
+            div.className = 'msg ' + sender;
+            var hours = time.getHours().toString().padStart(2, '0');
+            var minutes = time.getMinutes().toString().padStart(2, '0');
+            var timeStr = hours + ':' + minutes;
+            div.innerHTML = text + '<div class="time"><i class="far fa-clock"></i> ' + timeStr + '</div>';
             chatWindow.appendChild(div);
             chatWindow.scrollTop = chatWindow.scrollHeight;
             return div;
@@ -184,83 +181,62 @@ SUPPORT_HTML = '''
         function showTyping() {
             if (isTyping) return;
             isTyping = true;
-            const div = document.createElement('div');
+            var div = document.createElement('div');
             div.className = 'typing-indicator';
             div.id = 'typingIndicator';
-            div.innerHTML = `<span>Typing</span><span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
+            div.innerHTML = '<span>Typing</span><span class="dot"></span><span class="dot"></span><span class="dot"></span>';
             chatWindow.appendChild(div);
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
         function hideTyping() {
-            const el = document.getElementById('typingIndicator');
+            var el = document.getElementById('typingIndicator');
             if (el) el.remove();
             isTyping = false;
         }
 
         function getStaticAnswer(question) {
-            const q = question.toLowerCase();
-            if (q.includes('vip') || q.includes('key') || q.includes('unlock')) {
+            var q = question.toLowerCase();
+            if (q.indexOf('vip') !== -1 || q.indexOf('key') !== -1 || q.indexOf('unlock') !== -1) {
                 return "VIP keys are provided by the developer Arif. Please contact him via WhatsApp or Telegram.";
             }
-            if (q.includes('group') || q.includes('channel') || q.includes('community')) {
+            if (q.indexOf('group') !== -1 || q.indexOf('channel') !== -1 || q.indexOf('community') !== -1) {
                 return "You can join our WhatsApp Group (https://chat.whatsapp.com/Gu9rE3yaSDnCJutYOKPUME) or YouTube Channel (https://youtube.com/@hackingcyber-q4s).";
             }
-            if (q.includes('developer') || q.includes('arif') || q.includes('who made')) {
+            if (q.indexOf('developer') !== -1 || q.indexOf('arif') !== -1 || q.indexOf('who made') !== -1) {
                 return "The app is developed by Arif. He is a full-stack developer specializing in cybersecurity and app development.";
             }
-            if (q.includes('tool') || q.includes('feature')) {
+            if (q.indexOf('tool') !== -1 || q.indexOf('feature') !== -1) {
                 return "Cyber Tools offers many features: Device Info, News Generator, Age Calculator, URL Shortener, QR Scanner, VIP Tools like IP Tracker, Cyber Bomber, and more.";
             }
-            if (q.includes('download') || q.includes('apk')) {
+            if (q.indexOf('download') !== -1 || q.indexOf('apk') !== -1) {
                 return "You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu.";
             }
             return "I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer.";
         }
 
         async function getAIResponse(question) {
-            const prompt = `
-You are the "Cyber Tools" support agent for the Cyber Tools app.
+            var prompt = "You are the \"Cyber Tools\" support agent for the Cyber Tools app.\n\n**Your role:**\n- Answer questions about the app: features, VIP, tools, settings, account, sharing, and community links.\n- If the user asks about groups or channels, provide the WhatsApp Group and YouTube Channel links from the documentation.\n- If the user talks about hacking or illegal activities, politely say:\n  \"I am the Cyber Tools support agent. I only assist with app-related questions. Please ask about app features.\"\n\n**Language Rules:**\n- Respond in the EXACT same language the user used.\n- If the user writes in Hinglish (Hindi in Latin script), respond in Hinglish.\n- If the user writes in Bengali, respond in Bengali.\n- If the user writes in Hindi (Devanagari), respond in Hindi.\n- If the user writes in English, respond in English.\n- If the user writes in Arabic/Urdu, respond in that language.\n\n**Documentation:**\n" + DOCUMENTATION + "\n\nUser question: " + question;
 
-**Your role:**
-- Answer questions about the app: features, VIP, tools, settings, account, sharing, and community links.
-- If the user asks about groups or channels, provide the WhatsApp Group and YouTube Channel links from the documentation.
-- If the user talks about hacking or illegal activities, politely say:
-  "I am the Cyber Tools support agent. I only assist with app-related questions. Please ask about app features."
-
-**Language Rules:**
-- Respond in the EXACT same language the user used.
-- If the user writes in Hinglish (Hindi in Latin script), respond in Hinglish.
-- If the user writes in Bengali, respond in Bengali.
-- If the user writes in Hindi (Devanagari), respond in Hindi.
-- If the user writes in English, respond in English.
-- If the user writes in Arabic/Urdu, respond in that language.
-
-**Documentation:**
-${DOCUMENTATION}
-
-User question: ${question}
-            `.trim();
-
-            const res = await fetch(API_URL, {
+            var res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: prompt })
             });
             if (!res.ok) {
-                const errText = await res.text();
-                throw new Error(`HTTP ${res.status}: ${errText.slice(0,50)}`);
+                var errText = await res.text();
+                throw new Error('HTTP ' + res.status + ': ' + errText.slice(0, 50));
             }
-            const data = await res.json();
+            var data = await res.json();
             if (data.error) throw new Error(data.error);
             return data.reply;
         }
 
         async function handleSend() {
-            const question = userInput.value.trim();
+            var question = userInput.value.trim();
             if (!question) return;
 
-            const lang = detectLanguage(question);
+            var lang = detectLanguage(question);
             langLabel.textContent = lang;
 
             addMessage(question, 'user');
@@ -271,14 +247,14 @@ User question: ${question}
             showTyping();
 
             try {
-                const reply = await getAIResponse(question);
+                var reply = await getAIResponse(question);
                 hideTyping();
-                const formatted = reply.replace(/\\n/g, '<br>').replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
+                var formatted = reply.replace(/\\n/g, '<br>').replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
                 addMessage(formatted, 'bot');
             } catch (err) {
                 hideTyping();
-                const staticReply = getStaticAnswer(question);
-                const msg = '⚠️ Service offline – showing offline reply.\\n\\n' + staticReply;
+                var staticReply = getStaticAnswer(question);
+                var msg = '⚠️ Service offline – showing offline reply.\\n\\n' + staticReply;
                 addMessage(msg, 'bot');
                 console.error('API Error:', err);
             } finally {
@@ -289,15 +265,15 @@ User question: ${question}
 
         function clearChat() {
             chatWindow.innerHTML = '';
-            const welcome = document.createElement('div');
+            var welcome = document.createElement('div');
             welcome.className = 'msg bot';
-            welcome.innerHTML = `👋 Chat cleared. Ask a new question.<div class="time"><i class="far fa-clock"></i> Now</div>`;
+            welcome.innerHTML = '👋 Chat cleared. Ask a new question.<div class="time"><i class="far fa-clock"></i> Now</div>';
             chatWindow.appendChild(welcome);
             langLabel.textContent = 'English';
         }
 
         sendBtn.addEventListener('click', handleSend);
-        userInput.addEventListener('keydown', (e) => {
+        userInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
@@ -305,11 +281,11 @@ User question: ${question}
         });
         clearBtn.addEventListener('click', clearChat);
 
-        document.getElementById('whatsappLink').addEventListener('click', (e) => {
+        document.getElementById('whatsappLink').addEventListener('click', function(e) {
             e.preventDefault();
             window.open('https://wa.me/917865875762?text=Support+needed', '_blank');
         });
-        document.getElementById('telegramLink').addEventListener('click', (e) => {
+        document.getElementById('telegramLink').addEventListener('click', function(e) {
             e.preventDefault();
             window.open('https://t.me/your_support', '_blank');
         });
@@ -321,16 +297,10 @@ User question: ${question}
 </html>
 '''
 
-# ===================================================================
-# রুট – পেজ রেন্ডার
-# ===================================================================
 @bp.route('/')
 def support_page():
     return render_template_string(SUPPORT_HTML)
 
-# ===================================================================
-# চ্যাট API – আপনার ব্যাকেন্ড থেকে উত্তর দেয়
-# ===================================================================
 @bp.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
@@ -339,8 +309,6 @@ def chat():
 
     question = data['question']
 
-    # ===== আপনি এখানে আপনার নিজের AI/API বসাতে পারেন =====
-    # নিচে বাহ্যিক API-তে কল করার উদাহরণ (প্রোক্সি হিসেবে কাজ করবে)
     try:
         external_api = 'https://de3.bot-hosting.net:21007/kilwa-claude'
         resp = requests.post(
@@ -354,15 +322,12 @@ def chat():
             reply = result.get('reply') or result.get('response') or 'No reply'
             return jsonify({'reply': reply})
         else:
-            # API ব্যর্থ – স্ট্যাটিক উত্তর
             static = get_static_answer(question)
             return jsonify({'reply': static})
     except Exception as e:
         static = get_static_answer(question)
         return jsonify({'reply': static})
-# ===================================================================
-# স্ট্যাটিক উত্তর ফাংশন (ব্যাকেন্ডে)
-# ===================================================================
+
 def get_static_answer(question):
     q = question.lower()
     if 'vip' in q or 'key' in q or 'unlock' in q:
@@ -376,4 +341,3 @@ def get_static_answer(question):
     if 'download' in q or 'apk' in q:
         return "You are already inside the Cyber Tools app. To share it with friends, use the 'Share App' option from the drawer menu."
     return "I'm here to help with Cyber Tools app. Ask about VIP, tools, groups, or the developer."
-```
