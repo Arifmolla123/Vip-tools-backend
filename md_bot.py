@@ -7,7 +7,7 @@ import requests
 import logging
 import json
 
-# ========== লগিং সেটআপ ==========
+# ========== লগিং ==========
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def set_token(token):
     conn.commit()
     conn.close()
 
-# ========== ওয়েব সেটআপ পেজ (টোকেন দেওয়ার ফর্ম) ==========
+# ========== ওয়েব সেটআপ পেজ ==========
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if request.method == 'POST':
@@ -47,11 +47,11 @@ def setup():
         if not token:
             return "<h2 style='color:red;'>❌ Token cannot be empty!</h2><a href='/bot/setup'>Try Again</a>"
         
-        # ১. টোকেন সেভ করো
+        # ১. টোকেন সেভ
         set_token(token)
         logger.info("✅ Token saved to database.")
         
-        # ২. টোকেন ভ্যালিড কিনা চেক করো (getMe)
+        # ২. টোকেন ভ্যালিড চেক
         try:
             me = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=5)
             if not me.json().get('ok'):
@@ -61,13 +61,16 @@ def setup():
         
         logger.info("✅ Token validated with Telegram API.")
         
-        # ৩. ইউজারের কাছে লাইভ মেসেজ পাঠানোর চেষ্টা (যদি আগে থেকে বটে মেসেজ দিয়ে থাকে)
+        # ৩. ইউজারকে লাইভ নোটিফিকেশন পাঠানোর চেষ্টা (যদি আগে থেকে বটে মেসেজ দিয়ে থাকে)
         try:
             updates = requests.get(f"https://api.telegram.org/bot{token}/getUpdates", params={'limit': 1}, timeout=5)
             if updates.json().get('ok') and updates.json().get('result'):
                 chat_id = updates.json()['result'][0]['message']['chat']['id']
+                # HTML parse_mode ব্যবহার করছি
                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
-                              json={'chat_id': chat_id, 'text': '🛡️ *Cyber MD Bot is LIVE!* 🚀\nType /start to begin.', 'parse_mode': 'MarkdownV2'})
+                              json={'chat_id': chat_id, 
+                                    'text': '<b>🛡️ Cyber MD Bot is LIVE!</b> 🚀\nType /start to begin.',
+                                    'parse_mode': 'HTML'})
                 logger.info(f"✅ Live notification sent to chat {chat_id}")
         except Exception as e:
             logger.warning(f"Could not send live notification (user may not have started bot yet): {e}")
@@ -95,7 +98,7 @@ def setup():
     """
 
 # ==========================================================
-# ========== পোলিং ইঞ্জিন (এটাই বটের মূল প্রাণ) ==========
+# ========== পোলিং ইঞ্জিন (HTML parse_mode ব্যবহার) ==========
 # ==========================================================
 def polling_worker():
     logger.info("🔄 [WORKER] Polling thread started.")
@@ -107,17 +110,14 @@ def polling_worker():
             time.sleep(5)
             continue
         
-        # ১. প্রথমেই কনফ্লিক্ট এড়াতে ওয়েবহুক ডিলিট করে নাও
+        # ওয়েবহুক ডিলিট (পোলিং কনফ্লিক্ট এড়াতে)
         try:
             del_resp = requests.get(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=5)
-            if del_resp.json().get('ok'):
-                # শুধু একবার লগ করলেই হয়, তাই প্রতিবার না করে শর্ত দিই
-                pass 
+            # সফল হলে কিছু করি না
         except:
             pass
 
         try:
-            # ২. নতুন আপডেট চেক করো
             url = f"https://api.telegram.org/bot{token}/getUpdates"
             resp = requests.get(url, params={'offset': last_update_id + 1, 'timeout': 30})
             data = resp.json()
@@ -140,66 +140,64 @@ def polling_worker():
                     
                     logger.info(f"📩 Received: '{text}' from {username} (Chat: {chat_id})")
                     
-                    # ৩. কমান্ড প্রসেস করো
+                    # প্রসেস কমান্ড
                     reply = None
                     if text == '/start':
-                        reply = """🛡️ *Cyber MD Bot is LIVE!* 🚀
+                        reply = """<b>🛡️ Cyber MD Bot is LIVE!</b> 🚀
 
 I am your Markdown formatting bot.
 
-*Commands:*
-/bold [text] - **Bold**
-/italic [text] - _Italic_
-/code [text] - `Code`
-/strike [text] - ~Strike~
+<b>Commands:</b>
+/bold [text] - <b>Bold</b>
+/italic [text] - <i>Italic</i>
+/code [text] - <code>Code</code>
+/strike [text] - <s>Strike</s>
 /echo [text] - All formats
 /help - This message
 
-*Web Tools:* /bot/md/preview (if installed)"""
+<b>Web Tools:</b> /bot/md/preview (if installed)"""
                     
                     elif text == '/help':
                         reply = "Send /start to see all commands."
                     
                     elif text.startswith('/bold '):
-                        reply = f"*{text[6:]}*"
+                        reply = f"<b>{text[6:]}</b>"
                     elif text.startswith('/italic '):
-                        reply = f"_{text[8:]}_"
+                        reply = f"<i>{text[8:]}</i>"
                     elif text.startswith('/code '):
-                        reply = f"`{text[6:]}`"
+                        reply = f"<code>{text[6:]}</code>"
                     elif text.startswith('/strike '):
-                        reply = f"~{text[8:]}~"
+                        reply = f"<s>{text[8:]}</s>"
                     elif text.startswith('/echo '):
-                        reply = f"*{text[6:]}*, `code`, ~strike~"
+                        reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
                     else:
-                        # ফাঁকা বা অচেনা মেসেজ
+                        # অচেনা টেক্সট-এর জন্য কিছু না
                         pass
                     
-                    # ৪. রিপ্লাই পাঠাও (যদি থাকে)
                     if reply:
                         send_url = f"https://api.telegram.org/bot{token}/sendMessage"
                         r = requests.post(send_url, json={
                             'chat_id': chat_id,
                             'text': reply,
-                            'parse_mode': 'MarkdownV2'
+                            'parse_mode': 'HTML'   # ← HTML ব্যবহার করছি
                         }, timeout=5)
                         if r.json().get('ok'):
                             logger.info(f"✅ Replied to {chat_id}")
                         else:
                             logger.error(f"❌ Failed to send: {r.text}")
             
-            # স্লিপ না করে দ্রুত রেসপন্স দিতে ১ সেকেন্ড ওয়েট
-            time.sleep(1)
+            time.sleep(1)  # টানা রিকোয়েস্ট না পাঠাতে
             
         except Exception as e:
             logger.error(f"⚠️ Polling loop error: {e}")
             time.sleep(5)
 
-# ========== পোলিং থ্রেড চালু করো (Flask এর সাথে) ==========
+# ========== পোলিং থ্রেড চালু ==========
 polling_thread = threading.Thread(target=polling_worker, daemon=True)
 polling_thread.start()
 logger.info("🚀 [MAIN] Polling worker thread launched.")
 
-# ========== (অপশনাল) md_tools লোড করো ==========
+# ========== md_tools লোড (যদি থাকে) ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
