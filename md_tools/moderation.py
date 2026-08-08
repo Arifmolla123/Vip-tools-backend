@@ -101,19 +101,19 @@ def send_message(chat_id, text, token, parse_mode='HTML'):
     except:
         return False
 
-# ========== লিংক ডিটেক্ট (সব ধরনের লিংক) ==========
+# ========== লিংক ডিটেক্ট ==========
 def is_link(text):
     patterns = [
-        r'https?://\S+',                     # http:// বা https://
-        r'www\.[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}', # www.example.com
-        r'[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(/\S*)?' # example.com বা example.com/page
+        r'https?://\S+',
+        r'www\.[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}',
+        r'[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(/\S*)?'
     ]
     for pat in patterns:
         if re.search(pat, text, re.IGNORECASE):
             return True
     return False
 
-# ========== মডারেশন হ্যান্ডলার (অ্যাডমিন/ওনার বাদ) ==========
+# ========== মডারেশন হ্যান্ডলার ==========
 def handle_moderation(msg, token):
     if not token:
         return
@@ -122,19 +122,16 @@ def handle_moderation(msg, token):
     message_id = msg['message_id']
     text = msg.get('text', '')
 
-    # অ্যাডমিন/ওনার চেক – তাদের কোনো মডারেশন প্রযোজ্য নয়
     if is_admin(chat_id, user_id, token):
         logger.info(f"⏩ Admin/Owner {user_id} skipped moderation")
         return
 
-    # ১. অ্যান্টি-লিংক
     if get_mod_config('anti_link') == 'on' and is_link(text):
         delete_message(chat_id, message_id, token)
         send_message(chat_id, "🚫 <b>Anti-Link:</b> You are not allowed to send links here!", token)
         logger.info(f"🚫 Deleted link from {user_id}")
         return True
 
-    # ২. ব্যাড-ওয়ার্ড ফিল্টার
     if get_mod_config('bad_words') != '[]':
         try:
             bad_words_list = json.loads(get_mod_config('bad_words'))
@@ -166,7 +163,7 @@ def handle_moderation(msg, token):
 
     return False
 
-# ========== অ্যাডমিন কমান্ড (শুধুমাত্র অ্যাডমিনরা) ==========
+# ========== অ্যাডমিন কমান্ড ==========
 def handle_admin_commands(msg, token):
     text = msg.get('text', '')
     if not text.startswith('/'):
@@ -304,7 +301,7 @@ def handle_admin_commands(msg, token):
     if reply:
         send_message(chat_id, reply, token)
 
-# ========== ড্যাশবোর্ড (সুন্দর ডিজাইন) ==========
+# ========== ড্যাশবোর্ড (সেভ ফিক্স) ==========
 @bp.route('/dashboard', methods=['GET', 'POST'])
 def mod_dashboard():
     if request.method == 'POST':
@@ -315,7 +312,8 @@ def mod_dashboard():
             words = request.form.get('bad_words', '')
             words_list = [w.strip() for w in words.split(',') if w.strip()]
             set_mod_config('bad_words', json.dumps(words_list))
-            return redirect(url_for('moderation.mod_dashboard'))
+            # 🔥 সরাসরি URL রিডাইরেক্ট (ব্লুপ্রিন্ট সমস্যা এড়াতে)
+            return redirect('/bot/mod/dashboard')
         except Exception as e:
             logger.error(f"Error saving: {e}")
             return f"<h2 style='color:red;'>Error: {e}</h2><a href='/bot/mod/dashboard'>Go Back</a>"
@@ -404,7 +402,7 @@ def mod_dashboard():
                     </div>
                 </div>
                 <div class="input-group">
-                  <label>🛑 Bad Words (comma separated)</label>
+                    <label>🛑 Bad Words (comma separated)</label>
                     <input type="text" name="bad_words" class="input-field" placeholder="e.g. spam, porn, abuse" value="{{ bad_words_str }}">
                     <div class="helper-text">These words will trigger auto-delete + warning (for non‑admins).</div>
                 </div>
