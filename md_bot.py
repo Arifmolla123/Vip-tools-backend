@@ -197,20 +197,6 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 '''
 
 # ========== বট ফাংশন ==========
-def send_message(chat_id, text, parse_mode='HTML'):
-    token = get_token()
-    if not token:
-        return
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        r = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=5)
-        if r.json().get('ok'):
-            logger.info(f"✅ Sent message to {chat_id}")
-        else:
-            logger.error(f"❌ Send failed: {r.text}")
-    except Exception as e:
-        logger.error(f"Send error: {e}")
-
 def send_reactions(chat_id, message_id):
     if get_config('auto_react') != 'on':
         return
@@ -219,7 +205,9 @@ def send_reactions(chat_id, message_id):
         logger.error("❌ No token found.")
         return
 
-    emojis = ["❤️", "🔥", "👍", "🎉", "😂", "😍", "👏", "💯", "🤩", "🥳", "✨"]
+    # টেলিগ্রাম-সমর্থিত ইমোজি (সর্বোচ্চ ১১টি, কিন্তু এখানে ৬টি নিরাপদ)
+    emojis = ["👍", "❤️", "🔥", "🥰", "👏", "🎉"]
+    
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{token}/setMessageReaction"
@@ -231,10 +219,9 @@ def send_reactions(chat_id, message_id):
         r = requests.post(url, json=payload, timeout=10)
         data = r.json()
         if data.get('ok'):
-            logger.info(f"✅ 11 reactions sent to {message_id}")
+            logger.info(f"✅ {len(emojis)} reactions sent to {message_id}")
         else:
             logger.error(f"❌ React failed: {data}")
-            # বিশেষ করে গ্রুপে অ্যাডমিন না থাকলে এই মেসেজ দেবে
             if data.get('error_code') == 400 and 'message can\'t be reacted' in data.get('description', ''):
                 logger.warning("⚠️ Bot may not be admin in this group. Add bot as admin to react to others' messages.")
     except Exception as e:
