@@ -21,6 +21,7 @@ def init_db():
     c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_react', 'off')")
     c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_welcome', 'off')")
     c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_reply', 'off')")
+    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('moderation_enabled', 'off')")  # নতুন
     conn.commit()
     conn.close()
 init_db()
@@ -88,11 +89,13 @@ def setup_or_dashboard():
             set_config('auto_react', request.form.get('auto_react', 'off'))
             set_config('auto_welcome', request.form.get('auto_welcome', 'off'))
             set_config('auto_reply', request.form.get('auto_reply', 'off'))
+            set_config('moderation_enabled', request.form.get('moderation_enabled', 'off'))
             return redirect(url_for('md_bot.setup_or_dashboard'))
         status = {
             'auto_react': get_config('auto_react') == 'on',
             'auto_welcome': get_config('auto_welcome') == 'on',
             'auto_reply': get_config('auto_reply') == 'on',
+            'moderation_enabled': get_config('moderation_enabled') == 'on',
         }
         return render_template_string(DASHBOARD_HTML, status=status)
 
@@ -147,6 +150,8 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 .save-btn { width:100%; background:#238636; color:#fff; border:none; padding:14px; border-radius:14px; font-size:17px; font-weight:600; cursor:pointer; margin-top:12px; }
 .save-btn:hover { background:#2ea043; }
 .footer { text-align:center; color:#484f58; font-size:12px; margin-top:20px; }
+.mod-link { display:inline-block; margin-top:10px; color:#58a6ff; text-decoration:none; font-size:14px; }
+.mod-link:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -178,8 +183,16 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
                 <label><input type="radio" name="auto_reply" value="off" {{ 'checked' if not status.auto_reply else '' }}> OFF</label>
             </div>
         </div>
+        <div class="toggle-item">
+            <span class="toggle-label">🛡️ Moderation</span>
+            <div class="toggle-options">
+                <label><input type="radio" name="moderation_enabled" value="on" {{ 'checked' if status.moderation_enabled else '' }}> ON</label>
+                <label><input type="radio" name="moderation_enabled" value="off" {{ 'checked' if not status.moderation_enabled else '' }}> OFF</label>
+            </div>
+        </div>
         <button type="submit" class="save-btn">Save Settings</button>
     </form>
+    <a href="/bot/mod/dashboard" class="mod-link">⚙️ Advanced Moderation Settings →</a>
     <div class="footer">Token is hidden for security</div>
 </div>
 </body>
@@ -187,8 +200,7 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 '''
 
 # ========== বট ফাংশন ==========
-def send_message(chat_id, text, parse_mode='HTML'):
-    token = get_token()
+def send_message(chat_id, text, token, parse_mode='HTML'):
     if not token:
         return
     try:
@@ -201,16 +213,13 @@ def send_message(chat_id, text, parse_mode='HTML'):
     except Exception as e:
         logger.error(f"Send error: {e}")
 
-# ========== নতুন রিয়েক্ট ফাংশন (শুধু ৩টি ইমোজি) ==========
-def send_reactions(chat_id, message_id):
+def send_reactions(chat_id, message_id, token):
     if get_config('auto_react') != 'on':
         return
-    token = get_token()
     if not token:
         logger.error("❌ No token found.")
         return
 
-    # শুধুমাত্র ৩টি নিশ্চিত ইমোজি
     emojis = ["👍", "❤️", "🔥"]
     logger.info(f"📡 Sending {len(emojis)} reactions: {emojis}")
     try:
@@ -227,7 +236,6 @@ def send_reactions(chat_id, message_id):
             logger.info(f"✅ {len(emojis)} reactions sent to {message_id}")
         else:
             logger.error(f"❌ React failed: {data}")
-            # যদি error_code 400 এবং "REACTIONS_TOO_MANY" হয়, তাহলে আমরা ১টি করে পাঠাব
             if data.get('error_code') == 400 and 'REACTIONS_TOO_MANY' in data.get('description', ''):
                 logger.warning("⚠️ Too many reactions, trying one by one...")
                 for emoji in emojis:
@@ -242,7 +250,7 @@ def send_reactions(chat_id, message_id):
                             logger.info(f"✅ Single reaction {emoji} sent")
                         else:
                             logger.error(f"❌ Single {emoji} failed: {r2.json()}")
-                        time.sleep(0.5)  # small delay to avoid rate limits
+                        time.sleep(0.5)
                     except Exception as e2:
                         logger.error(f"Single reaction error: {e2}")
     except Exception as e:
@@ -251,7 +259,7 @@ def send_reactions(chat_id, message_id):
 # ========== কমান্ড ও অটো রিপ্লাই ==========
 processed_messages = set()
 
-def handle_auto_reply(msg):
+def handle_auto_reply(msg, token):
     if get_config('auto_reply') != 'on':
         return
     text = msg.get('text', '').lower().strip()
@@ -264,10 +272,10 @@ def handle_auto_reply(msg):
     processed_messages.add(message_id)
     for keyword, reply in AUTO_REPLIES.items():
         if keyword in text:
-            send_message(chat_id, reply)
+            send_message(chat_id, reply, token)
             break
 
-def handle_welcome(msg):
+def handle_welcome(msg, token):
     if get_config('auto_welcome') != 'on':
         return
     if 'new_chat_members' not in msg:
@@ -276,9 +284,9 @@ def handle_welcome(msg):
     for member in msg['new_chat_members']:
         name = member.get('first_name', 'Guest')
         welcome = f"<b>🎉 Welcome {name}!</b> 🥳\nGlad to have you here. Type /start to see what I can do."
-        send_message(chat_id, welcome)
+        send_message(chat_id, welcome, token)
 
-def handle_commands(msg):
+def handle_commands(msg, token):
     text = msg.get('text', '')
     if not text.startswith('/'):
         return
@@ -312,7 +320,10 @@ I reply to hi, good morning, good night, etc. (if enabled)."""
     elif text.startswith('/echo '):
         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
     if reply:
-        send_message(chat_id, reply)
+        send_message(chat_id, reply, token)
+
+# ========== মডারেশন ইমপোর্ট ==========
+from md_tools import moderation
 
 # ========== পোলিং ==========
 def polling_worker():
@@ -346,10 +357,18 @@ def polling_worker():
                 if not msg:
                     continue
                 logger.info(f"📩 Received: {msg.get('text', '')}")
-                send_reactions(msg['chat']['id'], msg['message_id'])
-                handle_commands(msg)
-                handle_auto_reply(msg)
-                handle_welcome(msg)
+                
+                # মূল ৩টি টুল
+                send_reactions(msg['chat']['id'], msg['message_id'], token)
+                handle_commands(msg, token)
+                handle_auto_reply(msg, token)
+                handle_welcome(msg, token)
+                
+                # মডারেশন (শুধুমাত্র যদি চালু থাকে)
+                if get_config('moderation_enabled') == 'on':
+                    moderation.handle_moderation(msg, token)
+                    moderation.handle_admin_commands(msg, token)
+                    
             time.sleep(1)
         except Exception as e:
             logger.error(f"Polling error: {e}")
@@ -368,6 +387,10 @@ if get_token():
 else:
     logger.info("⏳ No token found. Bot will start after token is set.")
 
+# ========== মডারেশন ব্লুপ্রিন্ট রেজিস্টার ==========
+bp.register_blueprint(moderation.bp)
+
+# ========== md_tools (অন্যান্য) ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
