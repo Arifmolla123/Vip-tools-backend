@@ -6,7 +6,6 @@ import threading
 import requests
 import json
 import logging
-import random
 
 # ========== Logging ==========
 logging.basicConfig(level=logging.INFO)
@@ -40,46 +39,7 @@ def set_token(token):
     conn.commit()
     conn.close()
 
-# ========== IMPROVED GIF SEARCH (Two APIs for reliability) ==========
-def search_gif(query):
-    """Search for a GIF using multiple free APIs."""
-    try:
-        # Try Giphy first (free, no key required)
-        url = "https://api.giphy.com/v1/gifs/search"
-        params = {
-            'api_key': 'dc6zaTOxFJmzC',  # public beta key
-            'q': query,
-            'limit': 10,
-            'rating': 'pg-13'
-        }
-        resp = requests.get(url, params=params, timeout=8)
-        data = resp.json()
-        if data.get('meta', {}).get('status') == 200 and data.get('data'):
-            # Pick a random GIF from the results
-            gif_data = random.choice(data['data'])
-            return gif_data['images']['original']['url']
-    except Exception as e:
-        logger.warning(f"Giphy failed: {e}")
-
-    # If Giphy fails, try Tenor (another free API)
-    try:
-        url = "https://g.tenor.com/v1/search"
-        params = {
-            'q': query,
-            'key': 'LIVDSRZULELA',  # public Tenor key
-            'limit': 10
-        }
-        resp = requests.get(url, params=params, timeout=8)
-        data = resp.json()
-        if data.get('results'):
-            gif = random.choice(data['results'])
-            return gif['media'][0]['gif']['url']
-    except Exception as e:
-        logger.warning(f"Tenor failed: {e}")
-
-    return None  # No GIF found
-
-# ========== Web Setup Page ==========
+# ========== Web Setup ==========
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if request.method == 'POST':
@@ -97,7 +57,7 @@ def setup():
         return f"""
         <h2 style='color:green;'>✅ Setup Complete!</h2>
         <p>Token: <code>{token[:10]}...</code></p>
-        <p>Now add me as Admin in your group/channel, then type <code>/start</code>.</p>
+        <p>Now add me to your group/channel. Type <code>/start</code> to begin.</p>
         <a href='/bot/setup'>Go Back</a>
         """
     current = get_token()
@@ -114,46 +74,25 @@ def setup():
     </body></html>
     """
 
-# ========== IMPROVED get_target_user (works with @username, name, or reply) ==========
-def get_target_user(update, token):
-    """Extract target user ID from reply or @username (with or without @)."""
-    msg = update.get('message')
-    if not msg:
-        return None, None
+# ========== Helper: Send reaction ==========
+def send_reaction(chat_id, message_id, token, emoji="❤️"):
+    """Send a reaction to a specific message"""
+    try:
+        url = f"https://api.telegram.org/bot{token}/setMessageReaction"
+        payload = {
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'reaction': json.dumps([{'type': 'emoji', 'emoji': emoji}])
+        }
+        r = requests.post(url, json=payload, timeout=5)
+        if r.json().get('ok'):
+            logger.info(f"✅ Reacted with {emoji} to message {message_id}")
+        else:
+            logger.error(f"❌ Reaction failed: {r.text}")
+    except Exception as e:
+        logger.error(f"Reaction error: {e}")
 
-    # 1. If replying to a message
-    if 'reply_to_message' in msg:
-        target = msg['reply_to_message']['from']
-        return target['id'], target.get('username', target.get('first_name', 'User'))
-
-    # 2. Parse command text for username
-    text = msg.get('text', '')
-    parts = text.split()
-    if len(parts) > 1:
-        username = parts[1].strip()
-        # Remove @ if present
-        if username.startswith('@'):
-            username = username[1:]
-        
-        # Try to get user_id using getChatMember
-        try:
-            # First, try to get by username
-            resp = requests.get(f"https://api.telegram.org/bot{token}/getChatMember",
-                                params={'chat_id': msg['chat']['id'], 'user_id': '@' + username})
-            data = resp.json()
-            if data.get('ok') and data.get('result'):
-                return data['result']['user']['id'], username
-        except:
-            pass
-        
-        # If that fails, try searching chat members by name (limited)
-        # Telegram API doesn't support direct search by first name, so we can only use this fallback.
-        # In practice, users should use @username or reply.
-        pass
-
-    return None, None
-
-# ========== Polling Worker (with fixed GIF & user targeting) ==========
+# ========== Polling Worker ==========
 def polling_worker():
     logger.info("🔄 [WORKER] Polling started.")
     last_update_id = 0
@@ -187,9 +126,13 @@ def polling_worker():
                         continue
 
                     chat_id = msg['chat']['id']
+                    message_id = msg['message_id']
                     text = msg.get('text', '')
                     username = msg['from'].get('username', 'Unknown')
                     logger.info(f"📩 Received: '{text}' from {username}")
+
+                    # ---------- AUTO REACTION ----------
+                    send_reaction(chat_id, message_id, token, "❤️")
 
                     reply = None
                     parse_mode = 'HTML'
@@ -203,25 +146,22 @@ def polling_worker():
 /italic [text] - <i>Italic</i>
 /code [text] - <code>Code</code>
 /strike [text] - <s>Strike</s>
-/echo [text] - All formats
+/echo [text] - All formats combined
 
-<b>🎨 GIF Command:</b>
-/gif [query] - Send a GIF (e.g. /gif happy dog)
+<b>✨ Auto Style:</b>
+Just type any text and I'll reply with it beautifully formatted!
 
-<b>👮 Admin Commands (Reply to a user or use @username):</b>
-/ban @username - Ban the user
-/kick @username - Kick the user
-/mute @username - Mute the user
-/unmute @username - Unmute the user
-/promote @username - Make Admin
-/demote @username - Remove Admin
-/del - (reply) Delete replied message
-/pin - (reply) Pin replied message
-/unpin - (reply) Unpin replied message
+<b>👋 Welcome:</b>
+I automatically welcome new members.
 
-<b>🔧 Conditions:</b> I must be an <b>Admin</b> in this group/channel!"""
+<b>🌐 Web Tools:</b>
+/bot/md/preview (if md_tools is installed)"""
 
-                    # ---------- Formatting ----------
+                    # ---------- /help ----------
+                    elif text == '/help':
+                        reply = "Send /start to see all available commands."
+
+                    # ---------- Formatting Commands ----------
                     elif text.startswith('/bold '):
                         reply = f"<b>{text[6:]}</b>"
                     elif text.startswith('/italic '):
@@ -233,144 +173,31 @@ def polling_worker():
                     elif text.startswith('/echo '):
                         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
 
-                    # ---------- FIXED GIF COMMAND ----------
-                    elif text.startswith('/gif '):
-                        query = text[5:].strip()
-                        if not query:
-                            reply = "❌ Please provide a search term. Example: `/gif happy dog`"
-                        else:
-                            gif_url = search_gif(query)
-                            if gif_url:
-                                try:
-                                    send_gif_url = f"https://api.telegram.org/bot{token}/sendAnimation"
-                                    r = requests.post(send_gif_url, json={
-                                        'chat_id': chat_id,
-                                        'animation': gif_url,
-                                        'caption': f"🎬 GIF for: {query}"
-                                    }, timeout=10)
-                                    if r.json().get('ok'):
-                                        logger.info(f"✅ GIF sent to {chat_id}")
-                                    else:
-                                        reply = f"❌ Failed to send GIF: {r.json().get('description')}"
-                                except Exception as e:
-                                    reply = f"❌ Error sending GIF: {e}"
-                            else:
-                                reply = f"❌ No GIF found for: {query}"
+                    # ---------- AUTO STYLE: Any non-command text ----------
+                    elif not text.startswith('/') and text.strip() != '':
+                        # Format the text with all styles
+                        styled = f"<b>{text}</b>\n<i>{text}</i>\n<code>{text}</code>\n<s>{text}</s>"
+                        reply = f"✨ <b>Auto‑styled version:</b>\n\n{styled}"
 
-                    # ---------- FIXED ADMIN COMMANDS (with better targeting) ----------
-                    elif text.startswith('/ban') or text.startswith('/kick') or text.startswith('/mute') or text.startswith('/unmute') or text.startswith('/promote') or text.startswith('/demote'):
-                        target_id, target_name = get_target_user(update, token)
-                        if not target_id:
-                            reply = "❌ Please reply to a user's message OR provide @username (e.g. /ban @username)"
-                        else:
-                            action = text.split()[0][1:]
-                            api_method = None
-                            params = {'chat_id': chat_id, 'user_id': target_id}
-
-                            if action == 'ban':
-                                api_method = 'banChatMember'
-                                reply = f"✅ {target_name} has been banned."
-                            elif action == 'kick':
-                                try:
-                                    requests.get(f"https://api.telegram.org/bot{token}/banChatMember", params=params, timeout=5)
-                                    requests.get(f"https://api.telegram.org/bot{token}/unbanChatMember", params=params, timeout=5)
-                                    reply = f"✅ {target_name} has been kicked."
-                                except Exception as e:
-                                    reply = f"❌ Kick failed: {e}"
-                                api_method = None
-                            elif action == 'mute':
-                                api_method = 'restrictChatMember'
-                                params['permissions'] = json.dumps({'can_send_messages': False})
-                                reply = f"🔇 {target_name} has been muted."
-                            elif action == 'unmute':
-                                api_method = 'restrictChatMember'
-                                params['permissions'] = json.dumps({'can_send_messages': True})
-                                reply = f"🔊 {target_name} has been unmuted."
-                            elif action == 'promote':
-                                api_method = 'promoteChatMember'
-                                params['can_manage_chat'] = True
-                                params['can_delete_messages'] = True
-                                params['can_restrict_members'] = True
-                                params['can_pin_messages'] = True
-                                reply = f"👑 {target_name} has been promoted to Admin."
-                            elif action == 'demote':
-                                api_method = 'promoteChatMember'
-                                params['can_manage_chat'] = False
-                                params['can_delete_messages'] = False
-                                params['can_restrict_members'] = False
-                                params['can_pin_messages'] = False
-                                reply = f"🛡️ {target_name}'s Admin rights have been revoked."
-
-                            if api_method:
-                                try:
-                                    r = requests.get(f"https://api.telegram.org/bot{token}/{api_method}", params=params, timeout=5)
-                                    if not r.json().get('ok'):
-                                        reply = f"❌ Failed: {r.json().get('description')}\n⚠️ Make sure I am an Admin!"
-                                except Exception as e:
-                                    reply = f"❌ API error: {e}"
-
-                    # ---------- Delete / Pin (unchanged) ----------
-                    elif text.startswith('/del'):
-                        if 'reply_to_message' in msg:
-                            target_msg_id = msg['reply_to_message']['message_id']
-                            try:
-                                r = requests.get(f"https://api.telegram.org/bot{token}/deleteMessage",
-                                                 params={'chat_id': chat_id, 'message_id': target_msg_id}, timeout=5)
-                                if r.json().get('ok'):
-                                    reply = "🗑️ Message deleted."
-                                else:
-                                    reply = f"❌ Could not delete: {r.json().get('description')}"
-                            except Exception as e:
-                                reply = f"❌ Error: {e}"
-                        else:
-                            reply = "❌ Reply to a message to delete it."
-
-                    elif text.startswith('/pin'):
-                        if 'reply_to_message' in msg:
-                            target_msg_id = msg['reply_to_message']['message_id']
-                            try:
-                                r = requests.get(f"https://api.telegram.org/bot{token}/pinChatMessage",
-                                                 params={'chat_id': chat_id, 'message_id': target_msg_id}, timeout=5)
-                                if r.json().get('ok'):
-                                    reply = "📌 Message pinned."
-                                else:
-                                    reply = f"❌ Could not pin: {r.json().get('description')}"
-                            except Exception as e:
-                                reply = f"❌ Error: {e}"
-                        else:
-                            reply = "❌ Reply to a message to pin it."
-
-                    elif text.startswith('/unpin'):
-                        try:
-                            if 'reply_to_message' in msg:
-                                target_msg_id = msg['reply_to_message']['message_id']
-                                r = requests.get(f"https://api.telegram.org/bot{token}/unpinChatMessage",
-                                                 params={'chat_id': chat_id, 'message_id': target_msg_id}, timeout=5)
-                            else:
-                                r = requests.get(f"https://api.telegram.org/bot{token}/unpinAllChatMessages",
-                                                 params={'chat_id': chat_id}, timeout=5)
-                            if r.json().get('ok'):
-                                reply = "📌 Unpinned successfully."
-                            else:
-                                reply = f"❌ Could not unpin: {r.json().get('description')}"
-                        except Exception as e:
-                            reply = f"❌ Error: {e}"
-
-                    # ---------- Auto-Welcome (unchanged) ----------
+                    # ---------- Welcome message ----------
                     if 'new_chat_members' in msg:
                         for member in msg['new_chat_members']:
                             first_name = member.get('first_name', 'Guest')
-                            welcome_text = f"🎉 *Welcome* {first_name}! 🥳\nGlad to have you here. Type /start to see what I can do."
+                            logger.info(f"👤 New member detected: {first_name}")
+                            welcome_text = f"<b>🎉 Welcome {first_name}!</b> 🥳\nGlad to have you here. Type /start to see what I can do."
                             try:
                                 send_url = f"https://api.telegram.org/bot{token}/sendMessage"
-                                requests.post(send_url, json={
+                                r = requests.post(send_url, json={
                                     'chat_id': chat_id,
                                     'text': welcome_text,
-                                    'parse_mode': 'MarkdownV2'
-                                })
-                                logger.info(f"✅ Welcome sent to {first_name}")
+                                    'parse_mode': 'HTML'
+                                }, timeout=5)
+                                if r.json().get('ok'):
+                                    logger.info(f"✅ Welcome sent to {first_name}")
+                                else:
+                                    logger.error(f"❌ Welcome failed: {r.text}")
                             except Exception as e:
-                                logger.error(f"Welcome failed: {e}")
+                                logger.error(f"Welcome exception: {e}")
 
                     # ---------- Send reply if any ----------
                     if reply:
@@ -391,11 +218,11 @@ def polling_worker():
             logger.error(f"⚠️ Polling error: {e}")
             time.sleep(5)
 
-# ========== Start Thread ==========
+# ========== Start Polling Thread ==========
 threading.Thread(target=polling_worker, daemon=True).start()
 logger.info("🚀 [MAIN] Polling worker launched.")
 
-# ========== Load md_tools ==========
+# ========== Load md_tools (if available) ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
@@ -403,4 +230,4 @@ try:
     bp.register_blueprint(formatter.bp)
     logger.info("✅ md_tools loaded.")
 except ImportError:
-    logger.warning("⚠️ md_tools not found.")
+    logger.warning("⚠️ md_tools not found (web tools unavailable).")
