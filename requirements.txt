@@ -3,3 +3,4 @@ gunicorn==21.2.0
 aiohttp
 requests
 markdown
+python-telegram-bot==20.7
