@@ -5,7 +5,7 @@ import threading
 import requests
 import json
 import logging
-import os
+import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def get_token():
 def set_token(token):
     set_config('bot_token', token)
 
-# ========== গ্লোবাল পোলিং থ্রেড রেফারেন্স ==========
+# ========== গ্লোবাল পোলিং থ্রেড ==========
 polling_thread = None
 
 # ========== অটো রিপ্লাই ডেটা ==========
@@ -75,7 +75,6 @@ def setup_or_dashboard():
                     if r.json().get('ok'):
                         set_token(new_token)
                         logger.info(f"✅ Token saved: {new_token[:10]}...")
-                        # টোকেন সেট করার পর পোলিং থ্রেড শুরু করো
                         start_polling_thread()
                         return redirect(url_for('md_bot.setup_or_dashboard'))
                     else:
@@ -212,31 +211,55 @@ def send_message(chat_id, text, parse_mode='HTML'):
         logger.error(f"Send error: {e}")
 
 def send_reactions(chat_id, message_id):
+    """অটো রিয়েক্ট পাঠানোর ফাংশন – শুধু প্রাইভেট চ্যাটে টেস্ট করুন"""
     if get_config('auto_react') != 'on':
         return
     token = get_token()
     if not token:
+        logger.error("❌ No token found.")
         return
+
     emojis = ["❤️", "🔥", "👍", "🎉", "😂", "😍", "👏", "💯", "🤩", "🥳", "✨"]
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{token}/setMessageReaction"
-        payload = {'chat_id': chat_id, 'message_id': message_id, 'reaction': json.dumps(reaction_list)}
+        payload = {
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'reaction': json.dumps(reaction_list)
+        }
+        logger.info(f"📡 Sending reaction to msg {message_id}")
         r = requests.post(url, json=payload, timeout=5)
-        if r.json().get('ok'):
+        data = r.json()
+        if data.get('ok'):
             logger.info(f"✅ 11 reactions sent to {message_id}")
         else:
-            logger.error(f"❌ React error: {r.text}")
+            logger.error(f"❌ React failed: {data}")
+            # যদি error_code 400 এবং "message can't be reacted" – তাহলে বুঝবেন গ্রুপে অ্যাডমিন না
+            if data.get('error_code') == 400 and 'message can\'t be reacted' in data.get('description', ''):
+                logger.warning("⚠️ Bot may not be admin. Add bot as admin in groups.")
     except Exception as e:
-        logger.error(f"React exception: {e}")
+        logger.error(f"❌ React exception: {e}")
+
+# ========== কমান্ড ও অটো রিপ্লাই (ডুপ্লিকেট ফিক্স) ==========
+# প্রতিটি মেসেজের জন্য একটি ফ্ল্যাগ রাখি, যাতে ডুপ্লিকেট রিপ্লাই না হয়
+processed_messages = set()
 
 def handle_auto_reply(msg):
+    """অটো রিপ্লাই – কীওয়ার্ড মিললে স্টাইলড রিপ্লাই পাঠায়"""
     if get_config('auto_reply') != 'on':
         return
     text = msg.get('text', '').lower().strip()
     if not text:
         return
     chat_id = msg['chat']['id']
+    message_id = msg['message_id']
+    
+    # ডুপ্লিকেট চেক
+    if message_id in processed_messages:
+        return
+    processed_messages.add(message_id)
+    
     for keyword, reply in AUTO_REPLIES.items():
         if keyword in text:
             send_message(chat_id, reply)
@@ -292,7 +315,7 @@ I reply to hi, good morning, good night, etc. with styled messages (if enabled).
     if reply:
         send_message(chat_id, reply)
 
-# ========== পোলিং ওয়ার্কার (এখন থ্রেড টোকেন ছাড়াও চলবে) ==========
+# ========== পোলিং ওয়ার্কার ==========
 def polling_worker():
     logger.info("🔄 Polling thread started. Waiting for token...")
     last_update_id = 0
@@ -330,7 +353,7 @@ def polling_worker():
             logger.error(f"Polling error: {e}")
             time.sleep(5)
 
-# ========== থ্রেড স্টার্ট ফাংশন (একবার শুরু হলে বারবার না) ==========
+# ========== থ্রেড স্টার্ট ==========
 def start_polling_thread():
     global polling_thread
     if polling_thread is None or not polling_thread.is_alive():
@@ -340,11 +363,10 @@ def start_polling_thread():
     else:
         logger.info("ℹ️ Polling thread already running.")
 
-# ========== অ্যাপ শুরুতে থ্রেড চালু করো (টোকেন থাকলেও না থাকলেও) ==========
 start_polling_thread()
 logger.info("✅ Bot module loaded.")
 
-# ========== md_tools (যদি থাকে) ==========
+# ========== md_tools ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
