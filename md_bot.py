@@ -6,6 +6,7 @@ import threading
 import requests
 import json
 import logging
+import random
 
 # ========== Logging ==========
 logging.basicConfig(level=logging.INFO)
@@ -74,19 +75,23 @@ def setup():
     </body></html>
     """
 
-# ========== Helper: Send reaction ==========
-def send_reaction(chat_id, message_id, token, emoji="❤️"):
-    """Send a reaction to a specific message"""
+# ========== Helper: Send multiple reactions ==========
+def send_reactions(chat_id, message_id, token, emojis=None):
+    """Send multiple reactions (max 11) to a message"""
+    if emojis is None:
+        emojis = ["❤️", "🔥", "👍", "🎉"]  # 4 reactions
     try:
+        # Telegram API format for multiple reactions
+        reaction_list = [{"type": "emoji", "emoji": emoji} for emoji in emojis]
         url = f"https://api.telegram.org/bot{token}/setMessageReaction"
         payload = {
             'chat_id': chat_id,
             'message_id': message_id,
-            'reaction': json.dumps([{'type': 'emoji', 'emoji': emoji}])
+            'reaction': json.dumps(reaction_list)
         }
         r = requests.post(url, json=payload, timeout=5)
         if r.json().get('ok'):
-            logger.info(f"✅ Reacted with {emoji} to message {message_id}")
+            logger.info(f"✅ Reacted with {len(emojis)} reactions to message {message_id}")
         else:
             logger.error(f"❌ Reaction failed: {r.text}")
     except Exception as e:
@@ -131,8 +136,8 @@ def polling_worker():
                     username = msg['from'].get('username', 'Unknown')
                     logger.info(f"📩 Received: '{text}' from {username}")
 
-                    # ---------- AUTO REACTION ----------
-                    send_reaction(chat_id, message_id, token, "❤️")
+                    # ---------- AUTO REACTION (4 reactions) ----------
+                    send_reactions(chat_id, message_id, token, ["❤️", "🔥", "👍", "🎉"])
 
                     reply = None
                     parse_mode = 'HTML'
@@ -149,7 +154,7 @@ def polling_worker():
 /echo [text] - All formats combined
 
 <b>✨ Auto Style:</b>
-Just type any text and I'll reply with it beautifully formatted!
+Just type any text and I'll reply with a <b>random</b> style (bold/italic/code/strike)!
 
 <b>👋 Welcome:</b>
 I automatically welcome new members.
@@ -161,7 +166,7 @@ I automatically welcome new members.
                     elif text == '/help':
                         reply = "Send /start to see all available commands."
 
-                    # ---------- Formatting Commands ----------
+                    # ---------- Manual Formatting Commands ----------
                     elif text.startswith('/bold '):
                         reply = f"<b>{text[6:]}</b>"
                     elif text.startswith('/italic '):
@@ -173,11 +178,19 @@ I automatically welcome new members.
                     elif text.startswith('/echo '):
                         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
 
-                    # ---------- AUTO STYLE: Any non-command text ----------
+                    # ---------- AUTO STYLE (Random one style, no extra text) ----------
                     elif not text.startswith('/') and text.strip() != '':
-                        # Format the text with all styles
-                        styled = f"<b>{text}</b>\n<i>{text}</i>\n<code>{text}</code>\n<s>{text}</s>"
-                        reply = f"✨ <b>Auto‑styled version:</b>\n\n{styled}"
+                        # List of styles: (tag, format)
+                        styles = [
+                            ("<b>{}</b>", "bold"),
+                            ("<i>{}</i>", "italic"),
+                            ("<code>{}</code>", "code"),
+                            ("<s>{}</s>", "strike")
+                        ]
+                        # Pick a random style
+                        format_str, style_name = random.choice(styles)
+                        reply = format_str.format(text)
+                        logger.info(f"🎨 Auto-styled with {style_name}")
 
                     # ---------- Welcome message ----------
                     if 'new_chat_members' in msg:
