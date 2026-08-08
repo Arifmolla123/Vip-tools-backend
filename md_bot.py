@@ -5,7 +5,7 @@ import threading
 import requests
 import json
 import logging
-import re
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,7 +50,10 @@ def get_token():
 def set_token(token):
     set_config('bot_token', token)
 
-# ========== অটো রিপ্লাই ডেটা (স্টাইল সহ) ==========
+# ========== গ্লোবাল পোলিং থ্রেড রেফারেন্স ==========
+polling_thread = None
+
+# ========== অটো রিপ্লাই ডেটা ==========
 AUTO_REPLIES = {
     'hi': '<b>Hello!</b> <i>How are you?</i> 😊',
     'hello': '<b>Hello!</b> <i>How can I help?</i>',
@@ -64,16 +67,16 @@ AUTO_REPLIES = {
 def setup_or_dashboard():
     token = get_token()
     if not token:
-        # টোকেন না থাকলে সেটআপ ফর্ম দেখাও
         if request.method == 'POST':
             new_token = request.form.get('bot_token', '').strip()
             if new_token:
-                # টোকেন ভ্যালিড চেক
                 try:
                     r = requests.get(f"https://api.telegram.org/bot{new_token}/getMe", timeout=5)
                     if r.json().get('ok'):
                         set_token(new_token)
                         logger.info(f"✅ Token saved: {new_token[:10]}...")
+                        # টোকেন সেট করার পর পোলিং থ্রেড শুরু করো
+                        start_polling_thread()
                         return redirect(url_for('md_bot.setup_or_dashboard'))
                     else:
                         error = "❌ Invalid token. Please check."
@@ -84,9 +87,7 @@ def setup_or_dashboard():
             return render_template_string(SETUP_HTML, error=error)
         return render_template_string(SETUP_HTML, error=None)
     else:
-        # টোকেন থাকলে ড্যাশবোর্ড দেখাও
         if request.method == 'POST':
-            # টগল অপশন
             auto_react = request.form.get('auto_react', 'off')
             auto_welcome = request.form.get('auto_welcome', 'off')
             auto_reply = request.form.get('auto_reply', 'off')
@@ -96,7 +97,6 @@ def setup_or_dashboard():
             logger.info(f"Settings updated: react={auto_react}, welcome={auto_welcome}, reply={auto_reply}")
             return redirect(url_for('md_bot.setup_or_dashboard'))
         
-        # বর্তমান স্ট্যাটাস
         status = {
             'auto_react': get_config('auto_react') == 'on',
             'auto_welcome': get_config('auto_welcome') == 'on',
@@ -237,7 +237,6 @@ def handle_auto_reply(msg):
     if not text:
         return
     chat_id = msg['chat']['id']
-    # চেক করি কোন কীওয়ার্ড মিলেছে
     for keyword, reply in AUTO_REPLIES.items():
         if keyword in text:
             send_message(chat_id, reply)
@@ -293,9 +292,9 @@ I reply to hi, good morning, good night, etc. with styled messages (if enabled).
     if reply:
         send_message(chat_id, reply)
 
-# ========== পোলিং ==========
+# ========== পোলিং ওয়ার্কার (এখন থ্রেড টোকেন ছাড়াও চলবে) ==========
 def polling_worker():
-    logger.info("🔄 Polling started.")
+    logger.info("🔄 Polling thread started. Waiting for token...")
     last_update_id = 0
     while True:
         token = get_token()
@@ -331,12 +330,19 @@ def polling_worker():
             logger.error(f"Polling error: {e}")
             time.sleep(5)
 
-# ========== থ্রেড স্টার্ট (টোকেন থাকলে) ==========
-if get_token():
-    threading.Thread(target=polling_worker, daemon=True).start()
-    logger.info("🚀 Bot started with existing token.")
-else:
-    logger.info("⏳ No token found. Bot will start after token is set.")
+# ========== থ্রেড স্টার্ট ফাংশন (একবার শুরু হলে বারবার না) ==========
+def start_polling_thread():
+    global polling_thread
+    if polling_thread is None or not polling_thread.is_alive():
+        polling_thread = threading.Thread(target=polling_worker, daemon=True)
+        polling_thread.start()
+        logger.info("🚀 Polling thread started.")
+    else:
+        logger.info("ℹ️ Polling thread already running.")
+
+# ========== অ্যাপ শুরুতে থ্রেড চালু করো (টোকেন থাকলেও না থাকলেও) ==========
+start_polling_thread()
+logger.info("✅ Bot module loaded.")
 
 # ========== md_tools (যদি থাকে) ==========
 try:
