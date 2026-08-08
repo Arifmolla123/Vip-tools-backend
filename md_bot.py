@@ -201,6 +201,7 @@ def send_message(chat_id, text, parse_mode='HTML'):
     except Exception as e:
         logger.error(f"Send error: {e}")
 
+# ========== নতুন রিয়েক্ট ফাংশন (শুধু ৩টি ইমোজি) ==========
 def send_reactions(chat_id, message_id):
     if get_config('auto_react') != 'on':
         return
@@ -209,8 +210,9 @@ def send_reactions(chat_id, message_id):
         logger.error("❌ No token found.")
         return
 
-    # টেলিগ্রাম-সমর্থিত ইমোজি (নিরাপদ ৬টি)
-    emojis = ["👍", "❤️", "🔥", "🥰", "👏", "🎉"]
+    # শুধুমাত্র ৩টি নিশ্চিত ইমোজি
+    emojis = ["👍", "❤️", "🔥"]
+    logger.info(f"📡 Sending {len(emojis)} reactions: {emojis}")
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{token}/setMessageReaction"
@@ -225,6 +227,24 @@ def send_reactions(chat_id, message_id):
             logger.info(f"✅ {len(emojis)} reactions sent to {message_id}")
         else:
             logger.error(f"❌ React failed: {data}")
+            # যদি error_code 400 এবং "REACTIONS_TOO_MANY" হয়, তাহলে আমরা ১টি করে পাঠাব
+            if data.get('error_code') == 400 and 'REACTIONS_TOO_MANY' in data.get('description', ''):
+                logger.warning("⚠️ Too many reactions, trying one by one...")
+                for emoji in emojis:
+                    try:
+                        single_payload = {
+                            'chat_id': chat_id,
+                            'message_id': message_id,
+                            'reaction': json.dumps([{"type": "emoji", "emoji": emoji}])
+                        }
+                        r2 = requests.post(url, json=single_payload, timeout=5)
+                        if r2.json().get('ok'):
+                            logger.info(f"✅ Single reaction {emoji} sent")
+                        else:
+                            logger.error(f"❌ Single {emoji} failed: {r2.json()}")
+                        time.sleep(0.5)  # small delay to avoid rate limits
+                    except Exception as e2:
+                        logger.error(f"Single reaction error: {e2}")
     except Exception as e:
         logger.error(f"❌ React exception: {e}")
 
