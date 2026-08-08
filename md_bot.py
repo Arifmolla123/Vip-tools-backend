@@ -5,7 +5,6 @@ import threading
 import requests
 import json
 import logging
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,10 +49,10 @@ def get_token():
 def set_token(token):
     set_config('bot_token', token)
 
-# ========== গ্লোবাল পোলিং থ্রেড ট্র্যাকিং ==========
+# ========== থ্রেড ট্র্যাকিং ==========
 polling_started = False
 
-# ========== অটো রিপ্লাই ডেটা ==========
+# ========== অটো রিপ্লাই ==========
 AUTO_REPLIES = {
     'hi': '<b>Hello!</b> <i>How are you?</i> 😊',
     'hello': '<b>Hello!</b> <i>How can I help?</i>',
@@ -62,7 +61,7 @@ AUTO_REPLIES = {
     'how are you': '<i>I\'m just a bot, but I\'m doing fine!</i> 😄',
 }
 
-# ========== ফ্লাস্ক রাউট ==========
+# ========== রাউট ==========
 @bp.route('/', methods=['GET', 'POST'])
 def setup_or_dashboard():
     token = get_token()
@@ -74,11 +73,10 @@ def setup_or_dashboard():
                     r = requests.get(f"https://api.telegram.org/bot{new_token}/getMe", timeout=5)
                     if r.json().get('ok'):
                         set_token(new_token)
-                        logger.info(f"✅ Token saved: {new_token[:10]}...")
                         start_polling_thread()
                         return redirect(url_for('md_bot.setup_or_dashboard'))
                     else:
-                        error = "❌ Invalid token. Please check."
+                        error = "❌ Invalid token."
                 except Exception as e:
                     error = f"❌ Error: {e}"
             else:
@@ -87,26 +85,20 @@ def setup_or_dashboard():
         return render_template_string(SETUP_HTML, error=None)
     else:
         if request.method == 'POST':
-            auto_react = request.form.get('auto_react', 'off')
-            auto_welcome = request.form.get('auto_welcome', 'off')
-            auto_reply = request.form.get('auto_reply', 'off')
-            set_config('auto_react', auto_react)
-            set_config('auto_welcome', auto_welcome)
-            set_config('auto_reply', auto_reply)
-            logger.info(f"Settings updated: react={auto_react}, welcome={auto_welcome}, reply={auto_reply}")
+            set_config('auto_react', request.form.get('auto_react', 'off'))
+            set_config('auto_welcome', request.form.get('auto_welcome', 'off'))
+            set_config('auto_reply', request.form.get('auto_reply', 'off'))
             return redirect(url_for('md_bot.setup_or_dashboard'))
-        
         status = {
             'auto_react': get_config('auto_react') == 'on',
             'auto_welcome': get_config('auto_welcome') == 'on',
             'auto_reply': get_config('auto_reply') == 'on',
         }
-        return render_template_string(DASHBOARD_HTML, status=status, bot_link="https://t.me/Arif1222_bot")
+        return render_template_string(DASHBOARD_HTML, status=status)
 
 SETUP_HTML = '''
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cyber Tools MD – Setup</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; }
@@ -136,8 +128,7 @@ button:hover { background:#2ea043; }
 
 DASHBOARD_HTML = '''
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cyber Tools MD – Dashboard</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; }
@@ -163,7 +154,7 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
     <h1>🛡️ Cyber Tools MD</h1>
     <div class="sub">Bot Control Panel</div>
     <div class="badge">● Active</div>
-    <a href="{{ bot_link }}" target="_blank" class="btn-open">📱 Open Bot</a>
+    <a href="https://t.me/Arif1222_bot" target="_blank" class="btn-open">📱 Open Bot</a>
     <hr class="divider">
     <form method="post">
         <div class="toggle-item">
@@ -181,7 +172,7 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
             </div>
         </div>
         <div class="toggle-item">
-            <span class="toggle-label">Auto Reply (hi, gm, gn etc.)</span>
+            <span class="toggle-label">Auto Reply</span>
             <div class="toggle-options">
                 <label><input type="radio" name="auto_reply" value="on" {{ 'checked' if status.auto_reply else '' }}> ON</label>
                 <label><input type="radio" name="auto_reply" value="off" {{ 'checked' if not status.auto_reply else '' }}> OFF</label>
@@ -234,8 +225,6 @@ def send_reactions(chat_id, message_id):
             logger.info(f"✅ {len(emojis)} reactions sent to {message_id}")
         else:
             logger.error(f"❌ React failed: {data}")
-            if data.get('error_code') == 400 and 'message can\'t be reacted' in data.get('description', ''):
-                logger.warning("⚠️ Bot may not be admin in this group. Add bot as admin to react to others' messages.")
     except Exception as e:
         logger.error(f"❌ React exception: {e}")
 
@@ -250,11 +239,9 @@ def handle_auto_reply(msg):
         return
     chat_id = msg['chat']['id']
     message_id = msg['message_id']
-    
     if message_id in processed_messages:
         return
     processed_messages.add(message_id)
-    
     for keyword, reply in AUTO_REPLIES.items():
         if keyword in text:
             send_message(chat_id, reply)
@@ -277,7 +264,6 @@ def handle_commands(msg):
         return
     chat_id = msg['chat']['id']
     reply = None
-
     if text == '/start':
         reply = """<b>🛡️ Cyber MD Bot is LIVE!</b> 🚀
 
@@ -292,8 +278,7 @@ def handle_commands(msg):
 /bot/ - Control all features
 
 <b>💬 Auto Reply:</b>
-I reply to hi, good morning, good night, etc. with styled messages (if enabled)."""
-    
+I reply to hi, good morning, good night, etc. (if enabled)."""
     elif text == '/help':
         reply = "Send /start to see commands."
     elif text.startswith('/bold '):
@@ -306,11 +291,10 @@ I reply to hi, good morning, good night, etc. with styled messages (if enabled).
         reply = f"<s>{text[8:]}</s>"
     elif text.startswith('/echo '):
         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
-    
     if reply:
         send_message(chat_id, reply)
 
-# ========== পোলিং ওয়ার্কার ==========
+# ========== পোলিং ==========
 def polling_worker():
     logger.info("🔄 Polling thread started.")
     last_update_id = 0
@@ -351,25 +335,19 @@ def polling_worker():
             logger.error(f"Polling error: {e}")
             time.sleep(5)
 
-# ========== নিরাপদ থ্রেড স্টার্ট (শুধুমাত্র একবার) ==========
 def start_polling_thread():
     global polling_started
     if polling_started:
-        logger.info("ℹ️ Polling thread already started (skipping).")
         return
-    thread = threading.Thread(target=polling_worker, daemon=True)
-    thread.start()
+    threading.Thread(target=polling_worker, daemon=True).start()
     polling_started = True
     logger.info("🚀 Polling thread started (first time).")
 
-# অ্যাপ চালু হওয়ার সময় থ্রেড চালু করো (যদি টোকেন থাকে)
 if get_token():
     start_polling_thread()
 else:
     logger.info("⏳ No token found. Bot will start after token is set.")
-logger.info("✅ Bot module loaded.")
 
-# ========== md_tools ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
