@@ -51,7 +51,6 @@ def set_token(token):
     set_config('bot_token', token)
 
 # ========== গ্লোবাল পোলিং থ্রেড ট্র্যাকিং ==========
-polling_thread = None
 polling_started = False
 
 # ========== অটো রিপ্লাই ডেটা ==========
@@ -197,6 +196,20 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 '''
 
 # ========== বট ফাংশন ==========
+def send_message(chat_id, text, parse_mode='HTML'):
+    token = get_token()
+    if not token:
+        return
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        r = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=5)
+        if r.json().get('ok'):
+            logger.info(f"✅ Sent message to {chat_id}")
+        else:
+            logger.error(f"❌ Send failed: {r.text}")
+    except Exception as e:
+        logger.error(f"Send error: {e}")
+
 def send_reactions(chat_id, message_id):
     if get_config('auto_react') != 'on':
         return
@@ -205,9 +218,8 @@ def send_reactions(chat_id, message_id):
         logger.error("❌ No token found.")
         return
 
-    # টেলিগ্রাম-সমর্থিত ইমোজি (সর্বোচ্চ ১১টি, কিন্তু এখানে ৬টি নিরাপদ)
+    # টেলিগ্রাম-সমর্থিত ইমোজি (নিরাপদ ৬টি)
     emojis = ["👍", "❤️", "🔥", "🥰", "👏", "🎉"]
-    
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{token}/setMessageReaction"
@@ -298,9 +310,9 @@ I reply to hi, good morning, good night, etc. with styled messages (if enabled).
     if reply:
         send_message(chat_id, reply)
 
-# ========== পোলিং ওয়ার্কার (এখন শুধু একবার চালানোর ব্যবস্থা) ==========
+# ========== পোলিং ওয়ার্কার ==========
 def polling_worker():
-    logger.info("🔄 Polling thread started. Waiting for token...")
+    logger.info("🔄 Polling thread started.")
     last_update_id = 0
     while True:
         token = get_token()
@@ -318,9 +330,8 @@ def polling_worker():
             )
             data = resp.json()
             if not data.get('ok'):
-                # 409 Conflict এলে তাও লগ করো, কিন্তু থামবে না
                 if data.get('error_code') == 409:
-                    logger.warning("⚠️ 409 Conflict – another polling instance is running. Will retry...")
+                    logger.warning("⚠️ 409 Conflict – another instance is running. Will retry...")
                 else:
                     logger.error(f"API error: {data}")
                 time.sleep(5)
@@ -342,17 +353,20 @@ def polling_worker():
 
 # ========== নিরাপদ থ্রেড স্টার্ট (শুধুমাত্র একবার) ==========
 def start_polling_thread():
-    global polling_thread, polling_started
+    global polling_started
     if polling_started:
         logger.info("ℹ️ Polling thread already started (skipping).")
         return
-    polling_thread = threading.Thread(target=polling_worker, daemon=True)
-    polling_thread.start()
+    thread = threading.Thread(target=polling_worker, daemon=True)
+    thread.start()
     polling_started = True
     logger.info("🚀 Polling thread started (first time).")
 
-# অ্যাপ চালু হওয়ার সময় থ্রেড চালু করো (যদি আগে না চালু থাকে)
-start_polling_thread()
+# অ্যাপ চালু হওয়ার সময় থ্রেড চালু করো (যদি টোকেন থাকে)
+if get_token():
+    start_polling_thread()
+else:
+    logger.info("⏳ No token found. Bot will start after token is set.")
 logger.info("✅ Bot module loaded.")
 
 # ========== md_tools ==========
