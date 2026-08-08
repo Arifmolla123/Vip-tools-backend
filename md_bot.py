@@ -5,7 +5,6 @@ import threading
 import requests
 import json
 import logging
-import os
 
 # ========== লগিং ==========
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +17,7 @@ BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1cpus1Z2iz6kOORo"
 BOT_LINK = "https://t.me/Arif1222_bot"
 DB_PATH = '/tmp/phish_data.db'
 
-# ========== ডেটাবেস (শুধু auto_react সেটিং) ==========
+# ========== ডেটাবেস ==========
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -46,7 +45,7 @@ def set_auto_react(status):
     conn.commit()
     conn.close()
 
-# ========== ড্যাশবোর্ড রাউট (মোবাইল ডিজাইন) ==========
+# ========== ড্যাশবোর্ড রাউট ==========
 @bp.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if request.method == 'POST':
@@ -91,14 +90,14 @@ def dashboard():
             <h1>Cyber Tools MD</h1>
             <div class="sub">Bot Control</div>
             <div class="badge">● Active</div>
-            <a href="{BOT_LINK}" target="_blank" class="btn">📱 Open Bot</a>
+            <a href="https://t.me/Arif1222_bot" target="_blank" class="btn">📱 Open Bot</a>
             <hr class="divider">
             <form method="post">
                 <div class="toggle">
                     <span class="toggle-label">Auto React</span>
                     <div class="options">
-                        <label><input type="radio" name="auto_react" value="on" {checked_on}> ON</label>
-                        <label><input type="radio" name="auto_react" value="off" {checked_off}> OFF</label>
+                        <label><input type="radio" name="auto_react" value="on" {{ "checked" if is_on else "" }}> ON</label>
+                        <label><input type="radio" name="auto_react" value="off" {{ "checked" if not is_on else "" }}> OFF</label>
                     </div>
                 </div>
                 <button type="submit" class="save">Save Settings</button>
@@ -107,12 +106,8 @@ def dashboard():
         </div>
     </body>
     </html>
-    '''.format(
-        BOT_LINK=BOT_LINK,
-        checked_on='checked' if is_on else '',
-        checked_off='checked' if not is_on else ''
-    )
-    return html
+    '''
+    return render_template_string(html, is_on=is_on)
 
 # ========== রিয়েক্ট ফাংশন ==========
 def send_reactions(chat_id, message_id):
@@ -235,7 +230,6 @@ def polling_worker():
                 msg = update.get('message')
                 if not msg:
                     continue
-                # সব ফাংশন কল
                 send_reactions(msg['chat']['id'], msg['message_id'])
                 handle_commands(msg)
                 handle_welcome(msg)
