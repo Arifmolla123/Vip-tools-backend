@@ -5,7 +5,7 @@ import threading
 import requests
 import json
 import logging
-import re
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,8 +50,9 @@ def get_token():
 def set_token(token):
     set_config('bot_token', token)
 
-# ========== গ্লোবাল পোলিং থ্রেড ==========
+# ========== গ্লোবাল পোলিং থ্রেড ট্র্যাকিং ==========
 polling_thread = None
+polling_started = False
 
 # ========== অটো রিপ্লাই ডেটা ==========
 AUTO_REPLIES = {
@@ -211,7 +212,6 @@ def send_message(chat_id, text, parse_mode='HTML'):
         logger.error(f"Send error: {e}")
 
 def send_reactions(chat_id, message_id):
-    """অটো রিয়েক্ট পাঠানোর ফাংশন – শুধু প্রাইভেট চ্যাটে টেস্ট করুন"""
     if get_config('auto_react') != 'on':
         return
     token = get_token()
@@ -228,25 +228,22 @@ def send_reactions(chat_id, message_id):
             'message_id': message_id,
             'reaction': json.dumps(reaction_list)
         }
-        logger.info(f"📡 Sending reaction to msg {message_id}")
-        r = requests.post(url, json=payload, timeout=5)
+        r = requests.post(url, json=payload, timeout=10)
         data = r.json()
         if data.get('ok'):
             logger.info(f"✅ 11 reactions sent to {message_id}")
         else:
             logger.error(f"❌ React failed: {data}")
-            # যদি error_code 400 এবং "message can't be reacted" – তাহলে বুঝবেন গ্রুপে অ্যাডমিন না
+            # বিশেষ করে গ্রুপে অ্যাডমিন না থাকলে এই মেসেজ দেবে
             if data.get('error_code') == 400 and 'message can\'t be reacted' in data.get('description', ''):
-                logger.warning("⚠️ Bot may not be admin. Add bot as admin in groups.")
+                logger.warning("⚠️ Bot may not be admin in this group. Add bot as admin to react to others' messages.")
     except Exception as e:
         logger.error(f"❌ React exception: {e}")
 
-# ========== কমান্ড ও অটো রিপ্লাই (ডুপ্লিকেট ফিক্স) ==========
-# প্রতিটি মেসেজের জন্য একটি ফ্ল্যাগ রাখি, যাতে ডুপ্লিকেট রিপ্লাই না হয়
+# ========== কমান্ড ও অটো রিপ্লাই ==========
 processed_messages = set()
 
 def handle_auto_reply(msg):
-    """অটো রিপ্লাই – কীওয়ার্ড মিললে স্টাইলড রিপ্লাই পাঠায়"""
     if get_config('auto_reply') != 'on':
         return
     text = msg.get('text', '').lower().strip()
@@ -255,7 +252,6 @@ def handle_auto_reply(msg):
     chat_id = msg['chat']['id']
     message_id = msg['message_id']
     
-    # ডুপ্লিকেট চেক
     if message_id in processed_messages:
         return
     processed_messages.add(message_id)
@@ -315,7 +311,7 @@ I reply to hi, good morning, good night, etc. with styled messages (if enabled).
     if reply:
         send_message(chat_id, reply)
 
-# ========== পোলিং ওয়ার্কার ==========
+# ========== পোলিং ওয়ার্কার (এখন শুধু একবার চালানোর ব্যবস্থা) ==========
 def polling_worker():
     logger.info("🔄 Polling thread started. Waiting for token...")
     last_update_id = 0
@@ -335,7 +331,11 @@ def polling_worker():
             )
             data = resp.json()
             if not data.get('ok'):
-                logger.error(f"API error: {data}")
+                # 409 Conflict এলে তাও লগ করো, কিন্তু থামবে না
+                if data.get('error_code') == 409:
+                    logger.warning("⚠️ 409 Conflict – another polling instance is running. Will retry...")
+                else:
+                    logger.error(f"API error: {data}")
                 time.sleep(5)
                 continue
             for update in data.get('result', []):
@@ -353,16 +353,18 @@ def polling_worker():
             logger.error(f"Polling error: {e}")
             time.sleep(5)
 
-# ========== থ্রেড স্টার্ট ==========
+# ========== নিরাপদ থ্রেড স্টার্ট (শুধুমাত্র একবার) ==========
 def start_polling_thread():
-    global polling_thread
-    if polling_thread is None or not polling_thread.is_alive():
-        polling_thread = threading.Thread(target=polling_worker, daemon=True)
-        polling_thread.start()
-        logger.info("🚀 Polling thread started.")
-    else:
-        logger.info("ℹ️ Polling thread already running.")
+    global polling_thread, polling_started
+    if polling_started:
+        logger.info("ℹ️ Polling thread already started (skipping).")
+        return
+    polling_thread = threading.Thread(target=polling_worker, daemon=True)
+    polling_thread.start()
+    polling_started = True
+    logger.info("🚀 Polling thread started (first time).")
 
+# অ্যাপ চালু হওয়ার সময় থ্রেড চালু করো (যদি আগে না চালু থাকে)
 start_polling_thread()
 logger.info("✅ Bot module loaded.")
 
