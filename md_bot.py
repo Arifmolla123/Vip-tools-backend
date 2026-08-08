@@ -1,4 +1,4 @@
-from flask import Blueprint, request, render_template_string, redirect, url_for
+from flask import Blueprint, request, redirect, url_for
 import sqlite3
 import time
 import threading
@@ -15,14 +15,14 @@ DB_PATH = '/tmp/phish_data.db'
 
 # ========== আপনার বটের টোকেন (হার্ডকোডেড) ==========
 BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
-BOT_USERNAME = "Arif1222_bot"
+BOT_LINK = "https://t.me/Arif1222_bot"  # শুধু লিংক, ইউজারনেম দেখানো হবে না
 
-# ========== Database (শুধু অটো রিঅ্যাক্ট সেটিংস) ==========
+# ========== Database (অটো রিঅ্যাক্ট সেটিংস) ==========
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS bot_config (key TEXT PRIMARY KEY, value TEXT)')
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_react', 'off')")  # ডিফল্ট অফ
+    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_react', 'off')")
     conn.commit()
     conn.close()
 init_db()
@@ -42,7 +42,7 @@ def set_auto_react(status):
     conn.commit()
     conn.close()
 
-# ========== ড্যাশবোর্ড (শুধু অটো রিঅ্যাক্ট টগল) ==========
+# ========== ড্যাশবোর্ড (মোবাইল অ্যাপ ডিজাইন) ==========
 @bp.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if request.method == 'POST':
@@ -53,41 +53,182 @@ def dashboard():
     
     current_status = get_auto_react()
     is_on = current_status == 'on'
-    bot_link = f"https://t.me/{BOT_USERNAME}"
     
+    # HTML – মোবাইল অ্যাপের মত ডিজাইন, শুধু "Open Bot" বাটন
     return f"""
     <!DOCTYPE html>
-    <html><body style="font-family:sans-serif;max-width:500px;margin:50px auto;background:#0d1117;color:#c9d1d9;padding:20px;border-radius:10px;">
-    <h2 style="color:#58a6ff;">🛡️ Cyber Tools MD</h2>
-    <h3>📊 Dashboard</h3>
-    <p><strong>Bot Status:</strong> ✅ Active</p>
-    
-    <p style="margin:20px 0;">
-        <a href="{bot_link}" target="_blank" 
-           style="background:#1f6feb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">
-           📱 Open Telegram Bot (@{BOT_USERNAME})
-        </a>
-    </p>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Cyber Tools MD</title>
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }}
+            body {{
+                background: #0d1117;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                padding: 20px;
+            }}
+            .card {{
+                background: #161b22;
+                border-radius: 28px;
+                padding: 30px 24px;
+                max-width: 400px;
+                width: 100%;
+                box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+                border: 1px solid #30363d;
+            }}
+            .app-icon {{
+                background: #1f6feb;
+                width: 64px;
+                height: 64px;
+                border-radius: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 32px;
+                margin-bottom: 16px;
+            }}
+            h1 {{
+                font-size: 24px;
+                font-weight: 600;
+                color: #f0f6fc;
+                margin-bottom: 4px;
+            }}
+            .sub {{
+                color: #8b949e;
+                font-size: 14px;
+                margin-bottom: 24px;
+            }}
+            .status-badge {{
+                display: inline-block;
+                background: #238636;
+                color: #fff;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 13px;
+                font-weight: 500;
+                margin-bottom: 20px;
+            }}
+            .btn-open {{
+                display: block;
+                background: #1f6feb;
+                color: #fff;
+                text-align: center;
+                padding: 14px;
+                border-radius: 14px;
+                font-size: 17px;
+                font-weight: 600;
+                text-decoration: none;
+                margin-bottom: 24px;
+                transition: background 0.2s;
+            }}
+            .btn-open:hover {{
+                background: #388bfd;
+            }}
+            .divider {{
+                border: none;
+                border-top: 1px solid #30363d;
+                margin: 20px 0;
+            }}
+            .toggle-group {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #0d1117;
+                padding: 12px 16px;
+                border-radius: 14px;
+                margin-bottom: 8px;
+            }}
+            .toggle-label {{
+                color: #c9d1d9;
+                font-size: 16px;
+                font-weight: 500;
+            }}
+            .toggle-options {{
+                display: flex;
+                gap: 12px;
+            }}
+            .toggle-options label {{
+                color: #8b949e;
+                font-size: 15px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+            }}
+            .toggle-options input[type="radio"] {{
+                accent-color: #1f6feb;
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+            }}
+            .btn-save {{
+                width: 100%;
+                background: #238636;
+                color: #fff;
+                border: none;
+                padding: 14px;
+                border-radius: 14px;
+                font-size: 17px;
+                font-weight: 600;
+                cursor: pointer;
+                margin-top: 12px;
+                transition: background 0.2s;
+            }}
+            .btn-save:hover {{
+                background: #2ea043;
+            }}
+            .footer {{
+                text-align: center;
+                color: #484f58;
+                font-size: 12px;
+                margin-top: 20px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="app-icon">🛡️</div>
+            <h1>Cyber Tools MD</h1>
+            <div class="sub">Bot Control Panel</div>
+            <div class="status-badge">● Active</div>
 
-    <hr style="border-color:#30363d;">
+            <a href="{BOT_LINK}" target="_blank" class="btn-open">📱 Open Bot</a>
 
-    <form method="post">
-    <p><strong>Auto React:</strong>
-    <label>
-        <input type="radio" name="auto_react" value="on" {'checked' if is_on else ''}> ON
-    </label>
-    <label>
-        <input type="radio" name="auto_react" value="off" {'checked' if not is_on else ''}> OFF
-    </label>
-    </p>
-    <button type="submit" style="margin-top:10px;background:#238636;color:#fff;padding:10px 20px;border:0;border-radius:6px;cursor:pointer;">Save Settings</button>
-    </form>
-    <p style="margin-top:20px;color:#8b949e;font-size:14px;">Token is hidden for security.</p>
-    </body></html>
+            <hr class="divider">
+
+            <form method="post">
+                <div class="toggle-group">
+                    <span class="toggle-label">Auto React</span>
+                    <div class="toggle-options">
+                        <label>
+                            <input type="radio" name="auto_react" value="on" {'checked' if is_on else ''}> ON
+                        </label>
+                        <label>
+                            <input type="radio" name="auto_react" value="off" {'checked' if not is_on else ''}> OFF
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn-save">Save Settings</button>
+            </form>
+            <div class="footer">Token is hidden for security</div>
+        </div>
+    </body>
+    </html>
     """
 
-# ========== Helper: Send multiple reactions (ONLY if auto_react is ON) ==========
+# ========== Helper: Send reactions (ONLY if auto_react is ON) ==========
 def send_reactions(chat_id, message_id, emojis=None):
+    # প্রতিবার ডেটাবেস থেকে রিয়েল-টাইম স্ট্যাটাস পড়ি
     if get_auto_react() != 'on':
         return
     if emojis is None:
@@ -142,7 +283,7 @@ def polling_worker():
                     username = msg['from'].get('username', 'Unknown')
                     logger.info(f"📩 Received: '{text}' from {username}")
 
-                    # ---------- AUTO REACTION ----------
+                    # ---------- AUTO REACTION (ডেটাবেস চেক করে) ----------
                     send_reactions(chat_id, message_id)
 
                     reply = None
