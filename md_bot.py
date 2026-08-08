@@ -1,26 +1,23 @@
-from flask import Blueprint, request, jsonify, render_template_string
-import requests
+from flask import Blueprint, request, render_template_string
 import os
 import sqlite3
 import logging
+import threading
+import requests
+import time
 
-# ====== লগিং সেটআপ (Render-এর Log-এ দেখানোর জন্য) ======
+# ========== লগিং সেটআপ ==========
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ====== ব্লুপ্রিন্ট ও ডেটাবেস সেটআপ ======
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 DB_PATH = '/tmp/phish_data.db'
 
+# ========== ডেটাবেস ফাংশন (টোকেন রাখার জন্য) ==========
 def init_bot_table():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS bot_config (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    ''')
+    c.execute('CREATE TABLE IF NOT EXISTS bot_config (key TEXT PRIMARY KEY, value TEXT)')
     c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('bot_token', '')")
     conn.commit()
     conn.close()
@@ -41,69 +38,63 @@ def set_token(new_token):
     conn.commit()
     conn.close()
 
-def send_telegram_message(chat_id, text, parse_mode='MarkdownV2'):
-    """টেলিগ্রামে মেসেজ পাঠানোর হেল্পার ফাংশন"""
-    token = get_token()
-    if not token:
-        logger.error("টোকেন নেই, মেসেজ পাঠানো যাচ্ছে না")
-        return
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': text,
-        'parse_mode': parse_mode,
-        'disable_web_page_preview': True
-    }
+# ========== টোকেন সেভ হওয়ার সাথে সাথে "Live" মেসেজ পাঠানোর ফাংশন ==========
+def send_live_notification(token):
+    """সেভ করা টোকেন দিয়ে বটকে 'Live' মেসেজ পাঠানোর চেষ্টা করি"""
     try:
-        resp = requests.post(url, json=payload, timeout=10)
-        if not resp.json().get('ok'):
-            logger.error(f"টেলিগ্রাম API ত্রুটি: {resp.text}")
+        # ১. ইউজারের সবচেয়ে সাম্প্রতিক চ্যাট আইডি বের করি
+        get_url = f"https://api.telegram.org/bot{token}/getUpdates"
+        resp = requests.get(get_url, params={'limit': 1, 'offset': -1}, timeout=5)
+        data = resp.json()
+        
+        if data.get('ok') and data.get('result'):
+            chat_id = data['result'][0]['message']['chat']['id']
+            # ২. ওই চ্যাটে মেসেজ পাঠাই
+            send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {
+                'chat_id': chat_id,
+                'text': '🛡️ *Cyber MD Bot is live!* 🚀\nআমি এখন সক্রিয়। /start দিয়ে কমান্ড দেখুন।',
+                'parse_mode': 'MarkdownV2'
+            }
+            requests.post(send_url, json=payload, timeout=5)
+            logger.info("✅ লাইভ নোটিফিকেশন সফলভাবে পাঠানো হয়েছে!")
+        else:
+            logger.info("ℹ️ কোনো পুরোনো চ্যাট পাওয়া যায়নি। ইউজার /start দিলে নোটিফিকেশন পাবে।")
     except Exception as e:
-        logger.error(f"মেসেজ পাঠাতে ব্যর্থ: {e}")
+        logger.warning(f"⚠️ লাইভ নোটিফিকেশন পাঠাতে ব্যর্থ (ইউজার হয়তো এখনো বট ওপেন করেনি): {e}")
 
-# ========== ১. সেটআপ ওয়েব পেজ (টোকেন দেওয়ার ফর্ম) ==========
+# ========== ওয়েব সেটআপ পেজ (টোকেন দেওয়ার ফর্ম) ==========
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if request.method == 'POST':
         token = request.form.get('bot_token', '').strip()
         if not token:
-            return render_template_string(ERROR_PAGE, msg="❌ Token cannot be empty!")
+            return render_template_string(ERROR_PAGE, msg="❌ টোকেন খালি রাখা যাবে না!")
         
         # টোকেন সেভ করো
         set_token(token)
         
-        # ওয়েবহুক সেট করো
-        render_url = os.environ.get('RENDER_EXTERNAL_URL')
-        if not render_url:
-            return render_template_string(ERROR_PAGE, msg="RENDER_EXTERNAL_URL পরিবেশ চলকটি সেট করা নেই!")
+        # 🔥 টোকেন সেভ হওয়ার সাথে সাথে "Live" মেসেজ পাঠানোর চেষ্টা করো
+        send_live_notification(token)
         
-        webhook_url = f"{render_url}/bot/webhook"
-        try:
-            resp = requests.get(f"https://api.telegram.org/bot{token}/setWebhook?url={webhook_url}", timeout=10)
-            data = resp.json()
-            if data.get('ok'):
-                return render_template_string(SUCCESS_PAGE, msg="Webhook set successfully ✅", token=token[:10]+'...')
-            else:
-                return render_template_string(ERROR_PAGE, msg=f"Webhook ব্যর্থ: {data.get('description')}")
-        except Exception as e:
-            return render_template_string(ERROR_PAGE, msg=f"নেটওয়ার্ক ত্রুটি: {str(e)}")
+        return render_template_string(SUCCESS_PAGE, msg="✅ টোকেন সেভ হয়েছে! বট সক্রিয় হচ্ছে।", token=token[:10]+'...')
     
     current_token = get_token()
     return render_template_string(SETUP_PAGE, has_token=bool(current_token))
 
-# ========== HTML টেমপ্লেট (সাজানো) ==========
+# ========== HTML টেমপ্লেট (সুন্দর ডার্ক থিম) ==========
 SETUP_PAGE = '''
 <!DOCTYPE html>
 <html>
 <head><title>Cyber Tools MD - Setup</title></head>
 <body style="font-family:sans-serif;max-width:500px;margin:50px auto;padding:20px;background:#0d1117;color:#c9d1d9;border-radius:10px;">
 <h2 style="color:#58a6ff;">🛡️ Cyber Tools MD</h2>
-<h3>🤖 Telegram Bot Setup</h3>
-{% if has_token %}<p style="color:#3fb950;">✅ Token is already saved. Enter a new one to update:</p>
-{% else %}<p>Please paste the token you got from <strong>@BotFather</strong>:</p>{% endif %}
+<h3>🤖 Bot Setup (Polling Mode)</h3>
+{% if has_token %}<p style="color:#3fb950;">✅ টোকেন সেভ আছে। নতুন দিতে চাইলে দিন:</p>
+{% else %}<p>@BotFather থেকে পাওয়া টোকেনটি দিন:</p>{% endif %}
 <form method="post">
-<input type="text" name="bot_token" placeholder="e.g. 7234567890:AAHdqTcv..." style="width:100%;padding:10px;margin:10px 0;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;">
-<button type="submit" style="background:#238636;color:#fff;padding:10px 20px;border:0;border-radius:6px;cursor:pointer;">Save & Activate</button>
+<input type="text" name="bot_token" placeholder="যেমন: 7234567890:AAHdqTcv..." style="width:100%;padding:10px;margin:10px 0;background:#161b22;color:#fff;border:1px solid #30363d;border-radius:6px;">
+<button type="submit" style="margin-top:10px;background:#238636;color:#fff;padding:10px 20px;border:0;border-radius:6px;cursor:pointer;">Save & Activate</button>
 </form>
 </body></html>
 '''
@@ -111,6 +102,7 @@ SUCCESS_PAGE = '''
 <!DOCTYPE html>
 <html><body style="font-family:sans-serif;max-width:500px;margin:50px auto;padding:20px;background:#0d1117;color:#c9d1d9;border-radius:10px;">
 <h2 style="color:#3fb950;">✅ Setup Complete!</h2><p>{{ msg }}</p><p>Token: <code>{{ token }}</code></p>
+<p>আপনার টেলিগ্রাম বটে এখন "Cyber MD Bot is live" মেসেজ চেক করুন।</p>
 <a href="/bot/setup" style="color:#58a6ff;">Go Back</a></body></html>
 '''
 ERROR_PAGE = '''
@@ -119,126 +111,109 @@ ERROR_PAGE = '''
 <h2 style="color:#f85149;">⚠️ Error</h2><p>{{ msg }}</p><a href="/bot/setup" style="color:#58a6ff;">Try Again</a></body></html>
 '''
 
-# ========== ২. টেলিগ্রাম ওয়েবহুক এন্ডপয়েন্ট (সব কমান্ড এখানে) ==========
-@bp.route('/webhook', methods=['POST'])
-def webhook():
-    try:
-        # টোকেন চেক
-        token = get_token()
-        if not token:
-            logger.warning("টোকেন নেই, অনুরোধ উপেক্ষা করা হলো")
-            return jsonify({'status': 'error', 'msg': 'Token not set'}), 403
-
-        # ইনকামিং ডেটা পার্স
-        update = request.get_json()
-        if not update or 'message' not in update:
-            return 'OK', 200
-
-        msg = update['message']
-        chat_id = msg['chat']['id']
-        text = msg.get('text', '').strip()
-        username = msg['from'].get('username', 'User')
-
-        logger.info(f"মেসেজ পেলাম: {text} (from {username})")
-
-        # ========== কমান্ড লিস্ট (এখানে সবকিছু!) ==========
-        # ১. /start - ওয়েলকাম + পুরো হেল্প
-        if text == '/start':
-            help_text = """
-*🛡️ Welcome to Cyber Tools MD Bot!*  
+# ======================================================
+# ========== পোলিং বট (টেলিগ্রাম লাইব্রেরি) ==========
+# ======================================================
+try:
+    from telegram import Update
+    from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+    
+    # ----- অ্যাসিঙ্ক হ্যান্ডলারগুলো -----
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("""
+🛡️ *Cyber MD Bot is live!* 🚀  
 আমি টেক্সট ফরম্যাটিং আর মার্কডাউন টুলসের বট।
 
-*📋 আমার কমান্ডগুলো দেখুন:*
+*Commands:*  
+/bold [text] - **Bold**  
+/italic [text] - _Italic_  
+/code [text] - `Code`  
+/strike [text] - ~Strike~  
+/echo [text] - All formats  
+/markdown - Cheat sheet  
+/help - This message
 
-1️⃣ `/bold [text]` - টেক্সটকে **বোল্ড** করে
-_উদাহরণ:_ `/bold Hello` → *Hello*
+*Web Tools:* /bot/md/preview, /bot/md/format
+""", parse_mode='MarkdownV2')
 
-2️⃣ `/italic [text]` - টেক্সটকে _ইটালিক_ করে
-_উদাহরণ:_ `/italic Hello` → _Hello_
+    async def bold(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = ' '.join(context.args)
+        if text: await update.message.reply_text(f"*{text}*", parse_mode='MarkdownV2')
+        else: await update.message.reply_text("দয়া করে টেক্সট দিন। যেমন: /bold Hello")
 
-3️⃣ `/code [text]` - টেক্সটকে `কোড` ফরম্যাটে দেখায়
-_উদাহরণ:_ `/code Hello` → `Hello`
+    async def italic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = ' '.join(context.args)
+        if text: await update.message.reply_text(f"_{text}_", parse_mode='MarkdownV2')
+        else: await update.message.reply_text("দয়া করে টেক্সট দিন। যেমন: /italic Hello")
 
-4️⃣ `/strike [text]` - টেক্সটের ওপর ~দাগ~ দেয়
-_উদাহরণ:_ `/strike Hello` → ~Hello~
+    async def code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = ' '.join(context.args)
+        if text: await update.message.reply_text(f"`{text}`", parse_mode='MarkdownV2')
+        else: await update.message.reply_text("দয়া করে টেক্সট দিন। যেমন: /code Hello")
 
-5️⃣ `/echo [text]` - সব ফরম্যাট একসাথে দেখায় (বোল্ড+কোড+স্ট্রাইক)
-_উদাহরণ:_ `/echo test`
+    async def strike(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = ' '.join(context.args)
+        if text: await update.message.reply_text(f"~{text}~", parse_mode='MarkdownV2')
+        else: await update.message.reply_text("দয়া করে টেক্সট দিন। যেমন: /strike Hello")
 
-6️⃣ `/markdown` - মার্কডাউন চিটশিট দেখায়
+    async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = ' '.join(context.args)
+        if text: await update.message.reply_text(f"*{text}*, `code`, ~strike~", parse_mode='MarkdownV2')
+        else: await update.message.reply_text("দয়া করে টেক্সট দিন। যেমন: /echo Hello")
 
-7️⃣ `/help` - এই হেল্প বার্তা দেখায়
+    async def markdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("""
+*Markdown Cheat Sheet:*  
+Bold: `*text*`  
+Italic: `_text_`  
+Code: `` `text` ``  
+Strike: `~text~`
+""", parse_mode='MarkdownV2')
 
-*🌐 ওয়েব টুলস (ব্রাউজারে খুলুন):*
-- /bot/md/preview (লাইভ প্রিভিউ)
-- /bot/md/format (ফরম্যাটার)
+    async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await start(update, context)
 
-🤖 *টিপ:* আমি গ্রুপে নতুন কাউকে দেখলেই স্বাগত জানাই!
-            """
-            send_telegram_message(chat_id, help_text)
+    async def reply_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text(f"আপনি লিখেছেন: _{update.message.text}_\n\nকমান্ড পেতে /start লিখুন।", parse_mode='MarkdownV2')
 
-        # ২. /help - শর্টকাট
-        elif text == '/help':
-            send_telegram_message(chat_id, "সব কমান্ড দেখতে `/start` টাইপ করুন।")
+    def run_polling():
+        """এটি আলাদা থ্রেডে চলে (ব্যাকগ্রাউন্ডে)"""
+        token = get_token()
+        if not token:
+            logger.warning("⛔ পোলিং শুরু হয়নি: টোকেন নেই। /bot/setup-এ গিয়ে সেট করুন।")
+            return
+        
+        logger.info("⏳ পোলিং বট শুরু হচ্ছে...")
+        app = Application.builder().token(token).build()
+        
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("help", help))
+        app.add_handler(CommandHandler("bold", bold))
+        app.add_handler(CommandHandler("italic", italic))
+        app.add_handler(CommandHandler("code", code))
+        app.add_handler(CommandHandler("strike", strike))
+        app.add_handler(CommandHandler("echo", echo))
+        app.add_handler(CommandHandler("markdown", markdown))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_all))
+        
+        logger.info("✅ পোলিং চালু! বট এখন লাইভ। ইউজার /start দিলে রেসপন্স পাবে।")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-        # ৩. /bold
-        elif text.startswith('/bold '):
-            content = text[6:]
-            send_telegram_message(chat_id, f"*{content}*")
+    # Flask অ্যাপ চালু হওয়ার সাথে সাথে পোলিং থ্রেড স্টার্ট করুন
+    threading.Thread(target=run_polling, daemon=True).start()
+    logger.info("🚀 অ্যাপ চালু হয়েছে। পোলিং থ্রেড স্টার্ট হচ্ছে...")
 
-        # ৪. /italic
-        elif text.startswith('/italic '):
-            content = text[8:]
-            send_telegram_message(chat_id, f"_{content}_")
+except ImportError:
+    logger.error("❌ 'python-telegram-bot' প্যাকেজ ইনস্টল নেই! requirements.txt-এ এটি যোগ করুন।")
 
-        # ৫. /code
-        elif text.startswith('/code '):
-            content = text[6:]
-            send_telegram_message(chat_id, f"`{content}`")
-
-        # ৬. /strike
-        elif text.startswith('/strike '):
-            content = text[8:]
-            send_telegram_message(chat_id, f"~{content}~")
-
-        # ৭. /echo (সম্মিলিত ফরম্যাট)
-        elif text.startswith('/echo '):
-            content = text[6:]
-            send_telegram_message(chat_id, f"আপনি পাঠিয়েছেন: *{content}*, `কোড` দেখুন, ~এটাও আছে~")
-
-        # ৮. /markdown (চিটশিট)
-        elif text == '/markdown':
-            send_telegram_message(chat_id, """
-*মার্কডাউন চিটশিট:*
-বোল্ড: `*টেক্সট*`
-ইটালিক: `_টেক্সট_`
-কোড: `` `টেক্সট` ``
-স্ট্রাইক: `~টেক্সট~`
-            """)
-
-        # ৯. গ্রুপে নতুন সদস্য জয়েন করলে স্বাগত
-        if 'new_chat_members' in msg:
-            for member in msg['new_chat_members']:
-                name = member.get('first_name', 'Guest')
-                send_telegram_message(chat_id, f"🎉 *স্বাগতম!* {name} গ্রুপে জয়েন করেছেন।\n/start দিয়ে কমান্ড দেখুন।")
-
-        # ১০. অজানা কমান্ড (ফাঁকা থাকলে কিছু না)
-        elif not text.startswith('/') and text != '':
-            # ইউজার যদি কোনো কমান্ড ছাড়া টেক্সট দেয়
-            send_telegram_message(chat_id, f"আপনি লিখেছেন: _{text}_\n\nকমান্ড পেতে `/start` টাইপ করুন।")
-
-        return 'OK', 200
-
-    except Exception as e:
-        logger.error(f"ওয়েবহুকে মারাত্মক ত্রুটি: {e}")
-        return jsonify({'status': 'error', 'msg': str(e)}), 500
-
-# ========== ৩. (অপশনাল) টুলস ফোল্ডার ইম্পোর্ট - যদি md_tools থাকে ==========
+# ======================================================
+# ========== md_tools ফোল্ডার থেকে টুলস লোড ==========
+# ======================================================
 try:
     from md_tools import preview, converter, formatter
-    bp.register_blueprint(preview.bp)
-    bp.register_blueprint(converter.bp)
-    bp.register_blueprint(formatter.bp)
+    bp.register_blueprint(preview.bp)      # URL: /bot/md/preview
+    bp.register_blueprint(converter.bp)    # URL: /bot/md/convert
+    bp.register_blueprint(formatter.bp)    # URL: /bot/md/format
     logger.info("✅ md_tools ব্লুপ্রিন্ট সফলভাবে রেজিস্টার হয়েছে")
-except ImportError:
-    logger.warning("⚠️ md_tools ফোল্ডার পাওয়া যায়নি, ওয়েব টুলস লোড হয়নি")
+except ImportError as e:
+    logger.warning(f"⚠️ md_tools ফোল্ডার পাওয়া যায়নি বা লোড হয়নি: {e}")
