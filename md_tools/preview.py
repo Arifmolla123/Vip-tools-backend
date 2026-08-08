@@ -1,7 +1,9 @@
 from flask import Blueprint, request, render_template_string
 import markdown
+import logging
 
 bp = Blueprint('md_preview', __name__, url_prefix='/md/preview')
+logger = logging.getLogger(__name__)
 
 TEMPLATE = '''
 <!DOCTYPE html>
@@ -22,11 +24,17 @@ TEMPLATE = '''
 {% endif %}
 </body></html>
 '''
+
 @bp.route('/', methods=['GET', 'POST'])
 def index():
     content = html = ''
     if request.method == 'POST':
-        content = request.form.get('content', '')
+        content = request.form.get('content', '').strip()
         if content:
-            html = markdown.markdown(content)
+            try:
+                html = markdown.markdown(content)
+                logger.info(f"Preview converted: {len(content)} characters")
+            except Exception as e:
+                html = f"<p style='color:#f85149;'>Conversion error: {e}</p>"
+                logger.error(f"Markdown conversion error: {e}")
     return render_template_string(TEMPLATE, content=content, html=html)
