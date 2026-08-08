@@ -1,6 +1,8 @@
 from flask import Blueprint, request, render_template_string
+import logging
 
 bp = Blueprint('md_formatter', __name__, url_prefix='/md/format')
+logger = logging.getLogger(__name__)
 
 TEMPLATE = '''
 <!DOCTYPE html>
@@ -27,20 +29,25 @@ TEMPLATE = '''
 {% endif %}
 </body></html>
 '''
+
 @bp.route('/', methods=['GET', 'POST'])
 def index():
     text = result = ''
     bold = italic = code = strike = False
+    
     if request.method == 'POST':
-        text = request.form.get('text', '')
+        text = request.form.get('text', '').strip()
         bold = 'bold' in request.form
         italic = 'italic' in request.form
         code = 'code' in request.form
         strike = 'strike' in request.form
+        
         if text:
             if bold: text = f'*{text}*'
             if italic: text = f'_{text}_'
             if code: text = f'`{text}`'
             if strike: text = f'~{text}~'
             result = text
+            logger.info(f"Formatted: {result}")
+    
     return render_template_string(TEMPLATE, text=text, result=result, bold=bold, italic=italic, code=code, strike=strike)
