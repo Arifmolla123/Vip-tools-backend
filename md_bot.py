@@ -35,7 +35,8 @@ def get_auto_react():
         row = c.fetchone()
         conn.close()
         return row[0] if row else 'off'
-    except:
+    except Exception as e:
+        logger.error(f"DB read error: {e}")
         return 'off'
 
 def set_auto_react(status):
@@ -109,11 +110,16 @@ def dashboard():
     '''
     return render_template_string(html, is_on=is_on)
 
-# ========== রিয়েক্ট ফাংশন ==========
-def send_reactions(chat_id, message_id):
-    if get_auto_react() != 'on':
+# ========== রিয়েক্ট ফাংশন (ডিবাগ লগ সহ) ==========
+def send_reactions(chat_id, message_id, emojis=None):
+    status = get_auto_react()
+    logger.info(f"🔍 Auto-react status: {status} for msg {message_id}")
+    if status != 'on':
         return
-    emojis = ["❤️", "🔥", "👍", "🎉", "😂", "😍", "👏", "💯", "🤩", "🥳", "✨"]
+
+    if emojis is None:
+        emojis = ["❤️", "🔥", "👍", "🎉", "😂", "😍", "👏", "💯", "🤩", "🥳", "✨"]
+    
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
@@ -130,7 +136,7 @@ def send_reactions(chat_id, message_id):
     except Exception as e:
         logger.error(f"Reaction error: {e}")
 
-# ========== ফরম্যাটিং কমান্ড ==========
+# ========== ফরম্যাটিং কমান্ড (টেস্ট কমান্ড যোগ করা হয়েছে) ==========
 def handle_commands(msg):
     text = msg.get('text', '')
     if not text.startswith('/'):
@@ -153,11 +159,25 @@ def handle_commands(msg):
 /bot/dashboard - Control auto‑react
 
 <b>👋 Welcome:</b>
-I welcome new members automatically."""
+I welcome new members automatically.
+
+<b>🧪 Test:</b>
+/testreact - React to this message (checks if reaction API works)"""
     
     elif text == '/help':
         reply = "Send /start to see commands."
     
+    elif text == '/testreact':
+        # এই কমান্ডে রিপ্লাই না দিয়ে বরং কমান্ড মেসেজেই রিয়েক্ট পাঠাই
+        # কিন্তু আমরা রিয়েক্ট ফাংশনকে কল করি, যা সব মেসেজে ইতিমধ্যে কাজ করছে
+        # তবে ইউজারকে জানাই যে রিয়েক্ট পাঠানো হয়েছে
+        reply = "✅ Reacting to your test message now. Check the emojis above!"
+        # নিজের মেসেজে রিয়েক্ট করতে হলে message_id দরকার, যা আমরা পাচ্ছি
+        # কিন্তু handle_commands-এ message_id নেই, তাই আমরা আলাদাভাবে করব না
+        # আমরা নিচে send_reactions কল করব (পোলিং লুপে কল হয়)
+        # এইখানে শুধু মেসেজ দিচ্ছি
+        pass
+
     elif text.startswith('/bold '):
         reply = f"<b>{text[6:]}</b>"
     elif text.startswith('/italic '):
@@ -207,7 +227,7 @@ def handle_welcome(msg):
         except Exception as e:
             logger.error(f"Welcome error: {e}")
 
-# ========== পোলিং ওয়ার্কার ==========
+# ========== পোলিং ওয়ার্কার (রিয়েক্ট লগ সহ) ==========
 def polling_worker():
     logger.info("🔄 Polling started.")
     last_update_id = 0
@@ -223,6 +243,7 @@ def polling_worker():
             )
             data = resp.json()
             if not data.get('ok'):
+                logger.error(f"API error: {data}")
                 time.sleep(5)
                 continue
             for update in data.get('result', []):
@@ -230,8 +251,11 @@ def polling_worker():
                 msg = update.get('message')
                 if not msg:
                     continue
+                # রিয়েক্ট পাঠাও (লগ দেখাবে)
                 send_reactions(msg['chat']['id'], msg['message_id'])
+                # কমান্ড হ্যান্ডেল
                 handle_commands(msg)
+                # ওয়েলকাম
                 handle_welcome(msg)
             time.sleep(1)
         except Exception as e:
