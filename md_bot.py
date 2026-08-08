@@ -5,14 +5,20 @@ import threading
 import requests
 import json
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 
-# ========== আপনার টোকেন (সঠিক) ==========
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
+# ========== এনভায়রনমেন্ট থেকে টোকেন ==========
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '').strip()
+if not BOT_TOKEN:
+    logger.error("❌ BOT_TOKEN environment variable is not set!")
+else:
+    logger.info(f"✅ BOT_TOKEN loaded (first 10 chars: {BOT_TOKEN[:10]}...)")
+
 BOT_LINK = "https://t.me/Arif1222_bot"
 DB_PATH = '/tmp/phish_data.db'
 
@@ -34,7 +40,8 @@ def get_auto_react():
         row = c.fetchone()
         conn.close()
         return row[0] if row else 'off'
-    except:
+    except Exception as e:
+        logger.error(f"DB read error: {e}")
         return 'off'
 
 def set_auto_react(status):
@@ -43,6 +50,7 @@ def set_auto_react(status):
     c.execute("UPDATE bot_config SET value=? WHERE key='auto_react'", (status,))
     conn.commit()
     conn.close()
+    logger.info(f"✅ DB updated: auto_react = {status}")
 
 # ========== ড্যাশবোর্ড ==========
 @bp.route('/dashboard', methods=['GET', 'POST'])
@@ -50,7 +58,6 @@ def dashboard():
     if request.method == 'POST':
         status = request.form.get('auto_react', 'off')
         set_auto_react(status)
-        logger.info(f"🔄 Auto-react set to: {status}")
         return redirect(url_for('md_bot.dashboard'))
     
     is_on = get_auto_react() == 'on'
@@ -104,12 +111,16 @@ def dashboard():
     </html>
     ''', is_on=is_on)
 
-# ========== রিয়েক্ট ফাংশন (ডাইরেক্ট টোকেন) ==========
-def send_reactions(chat_id, message_id):
-    status = get_auto_react()
-    if status != 'on':
-        return
-    
+# ========== রিয়েক্ট ফাংশন (ডিটেইল লগ) ==========
+def send_reactions(chat_id, message_id, force=False):
+    if not force:
+        status = get_auto_react()
+        logger.info(f"🔍 Auto-react status: {status} for msg {message_id}")
+        if status != 'on':
+            return
+    else:
+        logger.info(f"⚡ Force reaction to msg {message_id}")
+
     emojis = ["❤️", "🔥", "👍", "🎉", "😂", "😍", "👏", "💯", "🤩", "🥳", "✨"]
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
@@ -120,14 +131,18 @@ def send_reactions(chat_id, message_id):
             'reaction': json.dumps(reaction_list)
         }
         r = requests.post(url, json=payload, timeout=5)
-        if r.json().get('ok'):
+        data = r.json()
+        if data.get('ok'):
             logger.info(f"✅ 11 reactions sent to {message_id}")
         else:
-            logger.error(f"❌ React error: {r.text}")
+            logger.error(f"❌ Reaction API error: {data}")
+            # যদি error_code 400 হয় এবং message বলে "message can't be reacted", তখন বুঝবেন পারমিশন নেই
+            if data.get('error_code') == 400 and 'message can\'t be reacted' in data.get('description', ''):
+                logger.warning("⚠️ Bot may not be admin in this group. Add bot as admin to react to others' messages.")
     except Exception as e:
-        logger.error(f"❌ Exception: {e}")
+        logger.error(f"❌ Reaction exception: {e}")
 
-# ========== কমান্ড ==========
+# ========== কমান্ড হ্যান্ডলার ==========
 def handle_commands(msg):
     text = msg.get('text', '')
     if not text.startswith('/'):
@@ -148,10 +163,20 @@ def handle_commands(msg):
 <b>⚙️ Dashboard:</b>
 /bot/dashboard - Control auto‑react
 
+<b>🧪 Test:</b>
+/testreact - Send a test reaction (👍) to this message (ignores DB)
+
 <b>👋 Welcome:</b>
 I welcome new members automatically."""
+    
     elif text == '/help':
         reply = "Send /start to see commands."
+    
+    elif text == '/testreact':
+        # জোর করে রিয়েক্ট পাঠাই (force=True)
+        send_reactions(chat_id, msg['message_id'], force=True)
+        reply = "✅ Test reaction (👍) sent to this message! Check if you see it."
+    
     elif text.startswith('/bold '):
         reply = f"<b>{text[6:]}</b>"
     elif text.startswith('/italic '):
@@ -162,10 +187,6 @@ I welcome new members automatically."""
         reply = f"<s>{text[8:]}</s>"
     elif text.startswith('/echo '):
         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
-    elif text == '/testreact':
-        # টেস্ট কমান্ড: জোর করে ১টি রিয়েক্ট পাঠাই
-        send_reactions(msg['chat']['id'], msg['message_id'])
-        reply = "✅ Test reaction sent (👍) to this message!"
 
     if reply:
         try:
@@ -182,7 +203,7 @@ I welcome new members automatically."""
         except Exception as e:
             logger.error(f"Send error: {e}")
 
-# ========== ওয়েলকাম ==========
+# ========== ওয়েলকাম ==========
 def handle_welcome(msg):
     if 'new_chat_members' not in msg:
         return
@@ -207,7 +228,10 @@ def handle_welcome(msg):
 
 # ========== পোলিং ==========
 def polling_worker():
-    logger.info("🔄 Polling started.")
+    logger.info("🔄 Polling thread started.")
+    if not BOT_TOKEN:
+        logger.error("⛔ No token, polling will not work.")
+        return
     last_update_id = 0
     while True:
         try:
@@ -229,8 +253,8 @@ def polling_worker():
                 msg = update.get('message')
                 if not msg:
                     continue
-                logger.info(f"📩 Msg: {msg.get('text', '')}")
-                send_reactions(msg['chat']['id'], msg['message_id'])
+                logger.info(f"📩 Received: {msg.get('text', '')}")
+                send_reactions(msg['chat']['id'], msg['message_id'])  # force=False (ডিফল্ট)
                 handle_commands(msg)
                 handle_welcome(msg)
             time.sleep(1)
@@ -238,5 +262,19 @@ def polling_worker():
             logger.error(f"Polling error: {e}")
             time.sleep(5)
 
-threading.Thread(target=polling_worker, daemon=True).start()
-logger.info("🚀 Bot started.")
+# ========== থ্রেড স্টার্ট ==========
+if BOT_TOKEN:
+    threading.Thread(target=polling_worker, daemon=True).start()
+    logger.info("🚀 Bot started with token.")
+else:
+    logger.error("⛔ Bot NOT started due to missing token.")
+
+# ========== md_tools (যদি থাকে) ==========
+try:
+    from md_tools import preview, converter, formatter
+    bp.register_blueprint(preview.bp)
+    bp.register_blueprint(converter.bp)
+    bp.register_blueprint(formatter.bp)
+    logger.info("✅ md_tools loaded.")
+except:
+    pass
