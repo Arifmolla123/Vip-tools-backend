@@ -403,7 +403,7 @@ def mod_dashboard():
                 </div>
                 <div class="input-group">
                     <label>🛑 Bad Words (comma separated)</label>
-                    <input type="text" name="bad_words" class="input-field" placeholder="e.g. spam, porn, abuse" value="{{ bad_words_str }}">
+                    <input type="text" name="bad_words" class="input-field" placeholder="e.g. spam, abuse" value="{{ bad_words_str }}">
                     <div class="helper-text">These words will trigger auto-delete + warning (for non‑admins).</div>
                 </div>
                 <div class="input-group">
