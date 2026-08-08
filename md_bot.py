@@ -1,12 +1,10 @@
 from flask import Blueprint, request, render_template_string, redirect, url_for
-import os
 import sqlite3
 import time
 import threading
 import requests
 import json
 import logging
-import random
 
 # ========== Logging ==========
 logging.basicConfig(level=logging.INFO)
@@ -17,14 +15,14 @@ DB_PATH = '/tmp/phish_data.db'
 
 # ========== আপনার বটের টোকেন (হার্ডকোডেড) ==========
 BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
-BOT_USERNAME = "Arif1222_bot"  # @ চিহ্ন ছাড়া
+BOT_USERNAME = "Arif1222_bot"
 
 # ========== Database (শুধু অটো রিঅ্যাক্ট সেটিংস) ==========
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS bot_config (key TEXT PRIMARY KEY, value TEXT)')
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_react', 'on')")
+    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_react', 'off')")  # ডিফল্ট অফ
     conn.commit()
     conn.close()
 init_db()
@@ -35,7 +33,7 @@ def get_auto_react():
     c.execute("SELECT value FROM bot_config WHERE key='auto_react'")
     row = c.fetchone()
     conn.close()
-    return row[0] if row else 'on'
+    return row[0] if row else 'off'
 
 def set_auto_react(status):
     conn = sqlite3.connect(DB_PATH)
@@ -44,7 +42,7 @@ def set_auto_react(status):
     conn.commit()
     conn.close()
 
-# ========== ড্যাশবোর্ড (অটো রিঅ্যাক্ট টগল + বট লিংক) ==========
+# ========== ড্যাশবোর্ড (শুধু অটো রিঅ্যাক্ট টগল) ==========
 @bp.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if request.method == 'POST':
@@ -55,8 +53,6 @@ def dashboard():
     
     current_status = get_auto_react()
     is_on = current_status == 'on'
-    
-    # বটের লিংক তৈরি করছি
     bot_link = f"https://t.me/{BOT_USERNAME}"
     
     return f"""
@@ -66,8 +62,7 @@ def dashboard():
     <h3>📊 Dashboard</h3>
     <p><strong>Bot Status:</strong> ✅ Active</p>
     
-    <!-- বট লিংক বাটন -->
-    <p style="margin: 20px 0;">
+    <p style="margin:20px 0;">
         <a href="{bot_link}" target="_blank" 
            style="background:#1f6feb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">
            📱 Open Telegram Bot (@{BOT_USERNAME})
@@ -87,15 +82,13 @@ def dashboard():
     </p>
     <button type="submit" style="margin-top:10px;background:#238636;color:#fff;padding:10px 20px;border:0;border-radius:6px;cursor:pointer;">Save Settings</button>
     </form>
-    <p style="margin-top:20px;color:#8b949e;">Token is hidden for security.</p>
-    <a href='/' style="color:#58a6ff;">Go Home</a>
+    <p style="margin-top:20px;color:#8b949e;font-size:14px;">Token is hidden for security.</p>
     </body></html>
     """
 
-# ========== Helper: Send multiple reactions ==========
+# ========== Helper: Send multiple reactions (ONLY if auto_react is ON) ==========
 def send_reactions(chat_id, message_id, emojis=None):
     if get_auto_react() != 'on':
-        logger.info("⏸️ Auto-react is OFF, skipping reactions.")
         return
     if emojis is None:
         emojis = ["❤️", "🔥", "👍", "🎉"]
@@ -109,7 +102,7 @@ def send_reactions(chat_id, message_id, emojis=None):
         }
         r = requests.post(url, json=payload, timeout=5)
         if r.json().get('ok'):
-            logger.info(f"✅ Reacted with {len(emojis)} reactions to message {message_id}")
+            logger.info(f"✅ Reacted with {len(emojis)} reactions")
         else:
             logger.error(f"❌ Reaction failed: {r.text}")
     except Exception as e:
@@ -166,9 +159,6 @@ def polling_worker():
 /strike [text] - <s>Strike</s>
 /echo [text] - All formats combined
 
-<b>✨ Auto Style:</b>
-Just type any text and I'll reply with a <b>random</b> style (bold/italic/code/strike)!
-
 <b>⚙️ Dashboard:</b>
 /bot/dashboard - Control auto‑react ON/OFF
 
@@ -193,18 +183,6 @@ I automatically welcome new members.
                         reply = f"<s>{text[8:]}</s>"
                     elif text.startswith('/echo '):
                         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
-
-                    # ---------- AUTO STYLE (Random one style) ----------
-                    elif not text.startswith('/') and text.strip() != '':
-                        styles = [
-                            ("<b>{}</b>", "bold"),
-                            ("<i>{}</i>", "italic"),
-                            ("<code>{}</code>", "code"),
-                            ("<s>{}</s>", "strike")
-                        ]
-                        format_str, style_name = random.choice(styles)
-                        reply = format_str.format(text)
-                        logger.info(f"🎨 Auto-styled with {style_name}")
 
                     # ---------- Welcome message ----------
                     if 'new_chat_members' in msg:
