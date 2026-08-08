@@ -11,17 +11,16 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 
 # ========== আপনার বটের টোকেন ==========
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
+BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1cpus1Z2iz6kOORo"
 
-# ========== সব টুলস ইম্পোর্ট ও রেজিস্টার ==========
-from md_tools import dashboard, reactions, formatter, welcome
+# ========== শুধু dashboard ব্লুপ্রিন্ট রেজিস্টার ==========
+from md_tools.dashboard import bp as dashboard_bp
+bp.register_blueprint(dashboard_bp)
 
-bp.register_blueprint(dashboard.bp)
-bp.register_blueprint(reactions.bp)
-bp.register_blueprint(formatter.bp)
-bp.register_blueprint(welcome.bp)
+# ========== বাকি মডিউল ইম্পোর্ট (ব্লুপ্রিন্ট ছাড়া) ==========
+from md_tools import reactions, formatter, welcome
 
-# ========== পোলিং ওয়ার্কার (শুধু আপডেট সংগ্রহ করে) ==========
+# ========== পোলিং ওয়ার্কার ==========
 def polling_worker():
     logger.info("🔄 Polling started.")
     last_update_id = 0
@@ -44,8 +43,7 @@ def polling_worker():
                 msg = update.get('message')
                 if not msg:
                     continue
-                # প্রতিটি মেসেজের জন্য আলাদা টুলস কল করি
-                # (ড্যাশবোর্ডের সেটিংস reactions.py-তে চেক করবে)
+                # প্রতিটি মেসেজের জন্য আলাদা ফাংশন কল
                 reactions.handle_reaction(msg)
                 formatter.handle_commands(msg)
                 welcome.handle_new_member(msg)
