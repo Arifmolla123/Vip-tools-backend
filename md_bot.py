@@ -3,9 +3,18 @@ import requests
 import os
 import sqlite3
 
+# ====== ১. টুলস ফোল্ডার থেকে সব ব্লুপ্রিন্ট ইম্পোর্ট করো ======
+from md_tools import preview, converter, formatter
+
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 DB_PATH = '/tmp/phish_data.db'
 
+# ====== ২. টুলসগুলোকে এই bপি-এর সাথে রেজিস্টার করো ======
+bp.register_blueprint(preview.bp)      # URL: /bot/md/preview
+bp.register_blueprint(converter.bp)    # URL: /bot/md/convert
+bp.register_blueprint(formatter.bp)    # URL: /bot/md/format
+
+# ========== ডেটাবেস ফাংশন (টোকেন সংরক্ষণ) ==========
 def init_bot_table():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -58,7 +67,7 @@ def send_message(chat_id, text, parse_mode='MarkdownV2'):
     except Exception as e:
         print(f"Send error: {e}")
 
-# ========== SETUP PAGE (Token Input) ==========
+# ========== সেটআপ পেজ (টোকেন নেওয়ার জন্য) ==========
 @bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if request.method == 'POST':
@@ -114,7 +123,7 @@ ERROR_PAGE = '''
 </body></html>
 '''
 
-# ========== TELEGRAM WEBHOOK ==========
+# ========== টেলিগ্রাম ওয়েবহুক ==========
 @bp.route('/webhook', methods=['POST'])
 def webhook():
     token = get_token()
@@ -127,22 +136,23 @@ def webhook():
     chat_id = msg['chat']['id']
     text = msg.get('text', '')
 
-    # --- All commands in English ---
+    # --- কমান্ড (ইংরেজি) ---
     if text == '/start':
         send_message(chat_id, """
 *🛡️ Cyber Tools MD Bot*  
 Welcome to the Markdown Power Bot 🤖
 
 *Available Commands:*  
-/echo [text] - Format your text with bold, code, strike  
+/echo [text] - Format your text  
 /bold [text] - Make text **bold**  
 /italic [text] - Make text _italic_  
 /markdown - Show Markdown cheat sheet  
 /help - Show this message
 
-*Web Tools:*  
-/md/preview - Live Markdown preview  
-/md/format - Telegram formatter
+*Web Tools (accessible via browser):*  
+🔗 /bot/md/preview - Live Markdown preview  
+🔗 /bot/md/format - Telegram formatter  
+🔗 /bot/md/convert - API converter
         """)
     elif text.startswith('/echo '):
         user_text = text[6:]
@@ -162,7 +172,7 @@ Strike: `~text~`
     elif text == '/help':
         send_message(chat_id, "Type /start to see all commands.")
 
-    # Welcome new members in groups
+    # গ্রুপে জয়েন করলে স্বাগত
     if 'new_chat_members' in msg:
         for member in msg['new_chat_members']:
             name = member.get('first_name', 'Guest')
