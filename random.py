@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, request, session, redirect, url_for
+from flask import Blueprint, render_template, request, session, redirect, url_for, current_app
+from flask_socketio import emit
 import base64
-import main   # main মডিউল ইম্পোর্ট (সার্কুলার হবে না)
 
 bp = Blueprint('random', __name__, url_prefix='/random')
 
@@ -34,7 +34,28 @@ def admin_logout():
     session.pop('admin_logged_in', None)
     return redirect(url_for('random.admin'))
 
-# ========== Socket.IO ইভেন্ট (main.socketio ব্যবহার করে) ==========
+# ========== Socket.IO ইভেন্ট (current_app.socketio ব্যবহার করে) ==========
+# আমরা ফাংশন ডেফিনেশনের সময় socketio পাই না, তাই ইভেন্টগুলো রেজিস্টার করার জন্য
+# আমরা নিচে একটি ফাংশন তৈরি করেছি যা main.py থেকে কল হবে।
+# কিন্তু যেহেতু আমরা main.py-তে কোনো অতিরিক্ত কল করতে চাই না, তাই আমরা
+# main.py-তে socketio ডিফাইন করার পর random.py লোড হয়, তাই আমরা সরাসরি
+# main.socketio ইম্পোর্ট করতে পারি। কিন্তু আমি সার্কুলার ইম্পোর্ট এড়াতে
+# current_app ব্যবহার করছি।
+
+# এখানে ইভেন্টগুলো রেজিস্টার করার ফাংশন নেই, কারণ আমরা চাই main.py থেকে
+# কোনো কল না করতে। তাই আমি বিকল্প পদ্ধতি ব্যবহার করছি:
+# random.py-তে আমরা main.py-তে ডিফাইন করা socketio ইম্পোর্ট করব,
+# কিন্তু সার্কুলার ইম্পোর্ট এড়াতে আমরা main.py থেকে socketio ইম্পোর্ট করব
+# যখন ইভেন্টগুলো ডেকোরেটর হিসেবে অ্যাটাচ করব। তবে ডেকোরেটরগুলো মডিউল লোডের
+# সময় এক্সিকিউট হয়, তাই main.socketio ইম্পোর্ট করা যায় যদি main.py ইতিমধ্যে
+# socketio ডিফাইন করে থাকে। যেহেতু main.py আগে লোড হয় (কারণ আমরা main.py
+# থেকে random ইম্পোর্ট করি), তাই main.socketio ডিফাইন হওয়া উচিত।
+
+# কিন্তু ডেকোরেটর ব্যবহারের সময় main.socketio অ্যাক্সেস করা যায়। আমি নিচে
+# ডেকোরেটর ব্যবহার করছি main.socketio দিয়ে।
+
+import main   # main মডিউল ইম্পোর্ট (এখন main.py লোড হওয়ার পর random লোড হয়)
+
 @main.socketio.on('connect')
 def handle_connect():
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
@@ -49,7 +70,6 @@ def handle_connect():
     }
     if session.get('admin_logged_in'):
         admin_sids.add(request.sid)
-        from flask_socketio import emit
         emit('admin_update', clients, to=request.sid)
 
 @main.socketio.on('disconnect')
@@ -62,7 +82,6 @@ def handle_disconnect():
         admin_sids.remove(request.sid)
     emit_clients_except_self()
     if admin_sids:
-        from flask_socketio import emit
         emit('admin_update', clients, to=list(admin_sids))
 
 @main.socketio.on('ready')
@@ -74,7 +93,6 @@ def handle_ready():
             if v != request.sid:
                 emit_clients_except_self(to=v)
         if admin_sids:
-            from flask_socketio import emit
             emit('admin_update', clients, to=list(admin_sids))
 
 @main.socketio.on('location_update')
@@ -83,7 +101,6 @@ def handle_location(data):
         clients[request.sid]['location'] = data
         emit_clients_except_self()
         if admin_sids:
-            from flask_socketio import emit
             emit('admin_update', clients, to=list(admin_sids))
 
 @main.socketio.on('video_frame')
@@ -93,11 +110,9 @@ def handle_video(data):
         clients[request.sid]['audio_level'] = data.get('audio_volume', 0)
         emit_clients_except_self()
         if admin_sids:
-            from flask_socketio import emit
             emit('admin_update', clients, to=list(admin_sids))
 
 def emit_clients_except_self(to=None):
-    from flask_socketio import emit
     target_list = [to] if to else list(viewers)
     for target in target_list:
         filtered = {sid: data for sid, data in clients.items() if sid != target}
