@@ -6,7 +6,7 @@ from flask_socketio import SocketIO
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')   # ✅ সেশন সাপোর্টের জন্য
-
+app.socketio = socketio   # ✅ যোগ করো
 # ========== ডেটাবেস তৈরি করো ==========
 init_db()   # ✅ /tmp/phish_data.db তৈরি হবে
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
