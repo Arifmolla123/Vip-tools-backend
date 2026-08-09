@@ -39,7 +39,8 @@
 </div>
 <div id="clientsGrid" class="client-grid"></div>
 <script>
-    const socket = io();
+    // 🔥 এডমিন হিসেবে কানেক্ট – কুয়েরি প্যারামিটার 'admin=true' দিয়ে
+    const socket = io({ query: { admin: 'true' } });
     const CACHE_KEY = 'hacked_network_data';
 
     function loadCache() {
