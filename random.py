@@ -1,12 +1,11 @@
-from flask import Blueprint, render_template, request, session, redirect, url_for
-from flask_socketio import emit
+from flask import Blueprint, render_template, request, session, redirect, url_for, current_app
 import base64
-from main import socketio
 
 bp = Blueprint('random', __name__, url_prefix='/random')
 
 ADMIN_PASSWORD = 'admin123'
 
+# ডেটা স্টোর (গ্লোবাল)
 clients = {}
 viewers = set()
 admin_sids = set()
@@ -35,65 +34,74 @@ def admin_logout():
     session.pop('admin_logged_in', None)
     return redirect(url_for('random.admin'))
 
-# ========== Socket.IO ইভেন্ট ==========
-@socketio.on('connect')
-def handle_connect():
-    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    ua = request.headers.get('User-Agent')
-    clients[request.sid] = {
-        'id': ip,
-        'ip': ip,
-        'user_agent': ua,
-        'location': None,
-        'last_frame': None,
-        'audio_level': 0
-    }
-    if session.get('admin_logged_in'):
-        admin_sids.add(request.sid)
-        emit('admin_update', clients, to=request.sid)
+# ========== Socket.IO ইভেন্ট রেজিস্টার ফাংশন ==========
+def register_socket_events(socketio):
+    """main.py থেকে এই ফাংশন কল করতে হবে"""
+    
+    @socketio.on('connect')
+    def handle_connect():
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        ua = request.headers.get('User-Agent')
+        clients[request.sid] = {
+            'id': ip,
+            'ip': ip,
+            'user_agent': ua,
+            'location': None,
+            'last_frame': None,
+            'audio_level': 0
+        }
+        if session.get('admin_logged_in'):
+            admin_sids.add(request.sid)
+            from flask_socketio import emit
+            emit('admin_update', clients, to=request.sid)
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    if request.sid in clients:
-        del clients[request.sid]
-    if request.sid in viewers:
-        viewers.remove(request.sid)
-    if request.sid in admin_sids:
-        admin_sids.remove(request.sid)
-    emit_clients_except_self()
-    if admin_sids:
-        emit('admin_update', clients, to=list(admin_sids))
-
-@socketio.on('ready')
-def handle_ready():
-    if request.sid in clients:
-        viewers.add(request.sid)
-        emit_clients_except_self(to=request.sid)
-        for v in viewers:
-            if v != request.sid:
-                emit_clients_except_self(to=v)
-        if admin_sids:
-            emit('admin_update', clients, to=list(admin_sids))
-
-@socketio.on('location_update')
-def handle_location(data):
-    if request.sid in clients:
-        clients[request.sid]['location'] = data
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        if request.sid in clients:
+            del clients[request.sid]
+        if request.sid in viewers:
+            viewers.remove(request.sid)
+        if request.sid in admin_sids:
+            admin_sids.remove(request.sid)
         emit_clients_except_self()
         if admin_sids:
+            from flask_socketio import emit
             emit('admin_update', clients, to=list(admin_sids))
 
-@socketio.on('video_frame')
-def handle_video(data):
-    if request.sid in clients:
-        clients[request.sid]['last_frame'] = data.get('image')
-        clients[request.sid]['audio_level'] = data.get('audio_volume', 0)
-        emit_clients_except_self()
-        if admin_sids:
-            emit('admin_update', clients, to=list(admin_sids))
+    @socketio.on('ready')
+    def handle_ready():
+        if request.sid in clients:
+            viewers.add(request.sid)
+            emit_clients_except_self(to=request.sid)
+            for v in viewers:
+                if v != request.sid:
+                    emit_clients_except_self(to=v)
+            if admin_sids:
+                from flask_socketio import emit
+                emit('admin_update', clients, to=list(admin_sids))
 
-def emit_clients_except_self(to=None):
-    target_list = [to] if to else list(viewers)
-    for target in target_list:
-        filtered = {sid: data for sid, data in clients.items() if sid != target}
-        emit('clients_update', filtered, to=target)
+    @socketio.on('location_update')
+    def handle_location(data):
+        if request.sid in clients:
+            clients[request.sid]['location'] = data
+            emit_clients_except_self()
+            if admin_sids:
+                from flask_socketio import emit
+                emit('admin_update', clients, to=list(admin_sids))
+
+    @socketio.on('video_frame')
+    def handle_video(data):
+        if request.sid in clients:
+            clients[request.sid]['last_frame'] = data.get('image')
+            clients[request.sid]['audio_level'] = data.get('audio_volume', 0)
+            emit_clients_except_self()
+            if admin_sids:
+                from flask_socketio import emit
+                emit('admin_update', clients, to=list(admin_sids))
+
+    def emit_clients_except_self(to=None):
+        from flask_socketio import emit
+        target_list = [to] if to else list(viewers)
+        for target in target_list:
+            filtered = {sid: data for sid, data in clients.items() if sid != target}
+            emit('clients_update', filtered, to=target)
