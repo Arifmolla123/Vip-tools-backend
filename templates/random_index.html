@@ -37,8 +37,6 @@
         .audio-bar .fill{ height:100%; background:#00d4ff; border-radius:3px; transition:0.3s; }
         .no-data{ color:#556; font-style:italic; padding:10px 0; }
         .footer{ margin-top:30px; text-align:center; font-size:12px; color:#445; border-top:1px solid #1a2430; padding-top:15px; }
-        .badge-offline{ background:#ff6b6b33; color:#ff6b6b; padding:2px 10px; border-radius:20px; font-size:11px; margin-left:8px; }
-        .badge-online{ background:#00ff8833; color:#00ff88; padding:2px 10px; border-radius:20px; font-size:11px; margin-left:8px; }
     </style>
 </head>
 <body>
@@ -135,10 +133,17 @@
             document.getElementById('permissionBox').style.display = 'none';
             document.getElementById('dashboard').classList.add('active');
 
+            // নিজের প্রিভিউ – কিন্তু অডিও মিউটেড
             const video = document.createElement('video');
             video.srcObject = localStream;
-            video.play();
+            video.muted = true;
+            video.volume = 0;
+            video.playsInline = true;
+            video.autoplay = true;
+            // আমরা এই video এলিমেন্টটা কোনো DOM-এ রাখছি না, কারণ ইউজারকে নিজের ভিডিও দেখাতে চাইলে না
+            // বরং আমরা শুধু ক্যাপচারের জন্য রাখছি
             localVideo = video;
+            video.play();
 
             const audioContext = new AudioContext();
             const source = audioContext.createMediaStreamSource(localStream);
@@ -190,7 +195,6 @@
     }
 
     async function autoConnect() {
-        // প্রথমবার পারমিশন চাইবে
         await requestPermissions(true);
     }
 
@@ -209,7 +213,6 @@
     });
 
     socket.on('connect', () => {
-        // কানেক্ট হলে অটো পারমিশন চাইবে
         autoConnect();
     });
 
