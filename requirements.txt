@@ -3,4 +3,5 @@ gunicorn==21.2.0
 aiohttp
 requests
 markdown
-
+flask-socketio
+eventlet
