@@ -21,7 +21,7 @@ else:
     print("❌ random-এ bp নেই")
 
 # ========== বাকি ব্লুপ্রিন্ট ==========
-files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot']
+files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot', 'random_route']
 for file in files:
     try:
         module = importlib.import_module(file)
