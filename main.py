@@ -9,7 +9,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')   # �
 
 # ========== ডেটাবেস তৈরি করো ==========
 init_db()   # ✅ /tmp/phish_data.db তৈরি হবে
-
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # ========== ব্লুপ্রিন্ট লোড ==========
 files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot','random']
 for file in files:
