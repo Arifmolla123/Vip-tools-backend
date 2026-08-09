@@ -5,3 +5,4 @@ requests
 markdown
 flask-socketio
 eventlet
+pillow
