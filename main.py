@@ -9,21 +9,27 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')
 
 init_db()
 
-# ========== SocketIO সেটআপ ==========
+# ========== SocketIO ==========
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+app.socketio = socketio   # ✅ ১. socketio কে app-এ অ্যাটাচ করো
 
-# ========== সব ব্লুপ্রিন্ট লোড (এখানে random যোগ করো) ==========
-files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot', 'random']   # ✅ 'random' যোগ
+# ========== random ব্লুপ্রিন্ট সরাসরি রেজিস্টার করো ==========
+import random as random_module   # ✅ ২. random মডিউল ইম্পোর্ট করো
+if hasattr(random_module, 'bp'):
+    app.register_blueprint(random_module.bp)
+else:
+    print("❌ random-এ bp নেই")
+
+# ========== বাকি ব্লুপ্রিন্ট ==========
+files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot']
 for file in files:
     try:
         module = importlib.import_module(file)
         if hasattr(module, 'bp'):
             app.register_blueprint(module.bp)
-            print(f"✅ {file} ব্লুপ্রিন্ট রেজিস্টার হয়েছে")
     except ModuleNotFoundError:
         print(f"⚠️ {file}.py নেই – স্কিপ")
 
-# ========== হোম ও পিং ==========
 @app.route('/')
 def home():
     return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support', '/bot', '/random']}
