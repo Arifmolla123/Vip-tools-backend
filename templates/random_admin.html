@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        /* same as before */
         *{ margin:0; padding:0; box-sizing:border-box; }
         body{ background:#0b0e14; color:#c8d0dc; font-family:sans-serif; padding:20px; }
         .header{ display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #2a3a50; padding-bottom:15px; flex-wrap:wrap; gap:10px; }
@@ -53,11 +54,7 @@
     const socket = io();
     const CACHE_KEY = 'hacked_network_data';
 
-    console.log('Admin page loaded');
-
-    // কানেক্ট হওয়ার পর admin_room-এ যোগ দাও
     socket.on('connect', () => {
-        console.log('Admin socket connected, joining admin_room...');
         socket.emit('admin_join');
     });
 
@@ -69,7 +66,6 @@
     }
 
     function render(clientsData) {
-        console.log('Rendering clients:', clientsData);
         const grid = document.getElementById('clientsGrid');
         grid.innerHTML = '';
         const keys = Object.keys(clientsData);
@@ -128,7 +124,6 @@
     }
 
     socket.on('admin_update', (liveData) => {
-        console.log('Received admin_update:', liveData);
         const cache = loadCache();
         for (const [ip, data] of Object.entries(liveData)) {
             cache[ip] = data;
@@ -168,4 +163,4 @@
     });
 </script>
 </body>
-</html>
+    </html>
