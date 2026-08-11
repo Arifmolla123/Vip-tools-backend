@@ -11,14 +11,7 @@ init_db()
 
 # ========== SocketIO ==========
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-app.socketio = socketio   # ✅ ১. socketio কে app-এ অ্যাটাচ করো
-
-# ========== random ব্লুপ্রিন্ট সরাসরি রেজিস্টার করো ==========
-import random as random_module   # ✅ ২. random মডিউল ইম্পোর্ট করো
-if hasattr(random_module, 'bp'):
-    app.register_blueprint(random_module.bp)
-else:
-    print("❌ random-এ bp নেই")
+app.socketio = socketio
 
 # ========== বাকি ব্লুপ্রিন্ট ==========
 files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot', 'random_route']
@@ -27,6 +20,7 @@ for file in files:
         module = importlib.import_module(file)
         if hasattr(module, 'bp'):
             app.register_blueprint(module.bp)
+            print(f"✅ {file} ব্লুপ্রিন্ট রেজিস্টার হয়েছে")
     except ModuleNotFoundError:
         print(f"⚠️ {file}.py নেই – স্কিপ")
 
