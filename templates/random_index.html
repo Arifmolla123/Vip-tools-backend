@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* same as previous styles */
         *{ margin:0; padding:0; box-sizing:border-box; }
         body{ background:#0b0e14; color:#c8d0dc; font-family: 'Segoe UI', sans-serif; padding:20px; }
         .container{ max-width:1400px; margin:0 auto; }
@@ -65,7 +64,14 @@
 </div>
 
 <script>
-    const socket = io();
+    // রিকানেক্ট স্ট্র্যাটেজি সহ Socket.IO কানেকশন
+    const socket = io({
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        transports: ['websocket', 'polling']
+    });
+
     let localStream = null, localVideo = null;
     let permissionsGranted = false;
     const CACHE_KEY = 'hacked_network_data';
@@ -211,6 +217,7 @@
     });
 
     socket.on('connect', () => {
+        console.log('🔗 Socket connected');
         autoConnect();
     });
 
@@ -220,4 +227,4 @@
     });
 </script>
 </body>
-        </html>
+    </html>
