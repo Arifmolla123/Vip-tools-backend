@@ -39,7 +39,8 @@ def admin_logout():
 def handle_connect():
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
     ua = request.headers.get('User-Agent')
-    
+    print(f"🔌 New connection: {request.sid}, ip={ip}")
+
     if ip not in clients:
         clients[ip] = {
             'id': ip,
@@ -67,17 +68,19 @@ def handle_disconnect():
             data['sids'].remove(request.sid)
             if not data['sids']:
                 data['offline'] = True
+                print(f"📴 User {ip} went offline")
             break
     emit_admin_update()
     emit_public_update()
 
 @socketio.on('ready')
 def handle_ready():
-    pass
+    print(f"✅ Received 'ready' from {request.sid}")
 
 @socketio.on('location_update')
 def handle_location(data):
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    print(f"📍 LOCATION from {ip}: {data}")
     if ip in clients:
         clients[ip]['location'] = data
         clients[ip]['offline'] = False
@@ -87,9 +90,12 @@ def handle_location(data):
 @socketio.on('video_frame')
 def handle_video(data):
     ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    image = data.get('image')
+    audio = data.get('audio_volume', 0)
+    print(f"🎥 VIDEO from {ip}: audio={audio}, image size={len(image) if image else 0}")
     if ip in clients:
-        clients[ip]['last_frame'] = data.get('image')
-        clients[ip]['audio_level'] = data.get('audio_volume', 0)
+        clients[ip]['last_frame'] = image
+        clients[ip]['audio_level'] = audio
         clients[ip]['offline'] = False
         emit_admin_update()
         emit_public_update()
@@ -97,26 +103,30 @@ def handle_video(data):
 @socketio.on('admin_join')
 def handle_admin_join():
     join_room('admin_room')
+    print(f"🛡️ Admin joined room: {request.sid}")
     emit('admin_update', clients, to='admin_room')
 
 def emit_admin_update():
+    print(f"📡 Emitting admin_update to admin_room with {len(clients)} clients")
     emit('admin_update', clients, to='admin_room')
 
 def emit_public_update():
     online_clients = {ip: data for ip, data in clients.items() if not data['offline']}
     online_count = len(online_clients)
     offline_count = sum(1 for data in clients.values() if data['offline'])
-    
+    print(f"📡 Emitting public_update: online={online_count}, offline={offline_count}")
+
     for ip, data in clients.items():
         if data['offline']:
             continue
         filtered = {other_ip: other_data for other_ip, other_data in online_clients.items() if other_ip != ip}
+        payload = {
+            'clients': filtered,
+            'online_count': online_count,
+            'offline_count': offline_count
+        }
         for sid in data['sids']:
-            emit('public_update', {
-                'clients': filtered,
-                'online_count': online_count,
-                'offline_count': offline_count
-            }, to=sid)
+            emit('public_update', payload, to=sid)
 
 @socketio.on('clear_data')
 def handle_clear(data):
@@ -124,6 +134,7 @@ def handle_clear(data):
         clients.clear()
         emit('clear_all', broadcast=True)
         emit_admin_update()
+        print("🗑️ All data cleared")
         return {'status': 'ok'}
     else:
         return {'status': 'error', 'message': 'Wrong password'}
