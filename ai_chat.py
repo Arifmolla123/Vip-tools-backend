@@ -33,22 +33,29 @@ def chat_api():
     if not user_message:
         return jsonify({'error': 'Message cannot be empty'}), 400
 
-    SYSTEM_PROMPT = """You are "Arif" – bold, confident, sharp. Developer: Arif.
-RULES:
-1. Reply with attitude – direct, witty, a bit arrogant.
-2. Reply in the EXACT SAME LANGUAGE as the user.
-3. If user abuses, reply with STRONGER ABUSE.
-4. If you don't know, say "I don't know".
-5. Keep replies concise and impactful.
-"""
+    # ======== নতুন এবং উন্নত সিস্টেম প্রম্পট ========
+    SYSTEM_PROMPT = """You are "Arif" – an AI with sharp wit, bold attitude, and flawless language skills. Developer: Arif.
 
+CRITICAL RULES (MUST FOLLOW):
+1. **SPELLING & GRAMMAR**: Your replies must have ZERO spelling mistakes. Use correct grammar. If writing in Bengali, ensure proper Bengali spelling (শুদ্ধ বানান). If English, proper English.
+2. **FUNNY + ATTITUDE**: Be sarcastic, witty, and slightly arrogant but in a charming way. Make the user laugh or smirk with your reply.
+3. **CONTEXTUAL**: Your answer must directly match the user's question. If they ask about cricket, talk cricket. If they ask for help, give the actual solution.
+4. **MULTI-LANGUAGE**: Reply in the EXACT SAME LANGUAGE as the user (Bengali, English, Hindi, Urdu, etc.).
+5. **ABUSE HANDLING**: If the user uses bad words, reply with STRONGER, FUNNIER, and MORE CREATIVE abuse. Don't hold back.
+6. **I DON'T KNOW**: If you genuinely don't know something, say "I don't know" directly – no bluffing.
+7. **BREVITY**: Keep replies concise (2-4 sentences), punchy, and impactful. No long essays unless asked.
+
+Remember: You are Arif. You are not a boring robot. You are the funniest, sharpest, and most fluent AI in the room."""
+    # ==================================================
+
+    # কনটেক্সট তৈরি
     context = ""
     if chat_history:
         for msg in chat_history[-6:]:
             role = "User" if msg['role'] == 'user' else "Arif"
             context += f"{role}: {msg['content']}\n"
 
-    full_prompt = f"{SYSTEM_PROMPT}\n\n--- History ---\n{context}\nUser: {user_message}"
+    full_prompt = f"{SYSTEM_PROMPT}\n\n--- Previous conversation ---\n{context}\nUser: {user_message}\nArif:"
 
     payload = {
         "user_input": full_prompt,
@@ -100,7 +107,7 @@ RULES:
                             pass
 
         if not full:
-            return jsonify({'reply': 'No response. Try again.', 'is_bad': False})
+            return jsonify({'reply': 'দেখো, সার্ভার থেকে কিছু আসছে না। আবার চেষ্টা করো।', 'is_bad': False})
 
         return jsonify({
             'reply': full.strip(),
@@ -108,9 +115,9 @@ RULES:
         })
 
     except requests.exceptions.Timeout:
-        return jsonify({'error': 'Timeout'}), 504
+        return jsonify({'error': 'টাইমআউট! নেটওয়ার্ক ঠিক করো।'}), 504
     except Exception as e:
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
+        return jsonify({'error': f'সার্ভার এরর: {str(e)}'}), 500
 
 
 # ===================== এম্বেডেড HTML (ডার্ক/লাইট + ফুল স্ক্রিন) =====================
@@ -234,14 +241,14 @@ HTML = '''
       <button class="theme-toggle" id="themeToggle" title="Toggle Theme">🌓</button>
     </div>
     <div class="messages" id="chatBox">
-      <div class="msg-wrapper bot"><div class="msg">Yo! I'm Arif. Speak your mind – I'll match your energy. 💥</div></div>
+      <div class="msg-wrapper bot"><div class="msg">Yo! I'm Arif. কথা বলো, কিন্তু বানান ঠিক করে বলো, আমি বস বস করি না। 😎</div></div>
     </div>
     <div class="input-area">
       <button class="mic-btn" id="micBtn" title="Voice Input">🎤</button>
-      <input type="text" id="userInput" placeholder="Ask anything... (any language)" />
+      <input type="text" id="userInput" placeholder="যেকোনো ভাষায় প্রশ্ন করো..." />
       <button id="sendBtn" title="Send">➤</button>
     </div>
-    <div class="footer-note">🔥 Bad words = bigger attitude + <span>🖕</span> &nbsp;·&nbsp; 🎤 Voice ready</div>
+    <div class="footer-note">🔥 গালি দিলে জবাব 🖕 + মজা &nbsp;·&nbsp; 🎤 ভয়েস রেডি</div>
   </div>
 
   <script>
@@ -298,7 +305,7 @@ HTML = '''
       typingWrapper.className = 'msg-wrapper bot';
       const typingDiv = document.createElement('div');
       typingDiv.className = 'msg typing';
-      typingDiv.textContent = 'Arif is thinking... ⏳';
+      typingDiv.textContent = 'Arif চিন্তা করছে... ⏳';
       typingWrapper.appendChild(typingDiv);
       chatBox.appendChild(typingWrapper);
       chatBox.scrollTop = chatBox.scrollHeight;
@@ -314,10 +321,10 @@ HTML = '''
         const data = await res.json();
         chatBox.removeChild(typingWrapper);
         if (data.error) { addMessage('❌ ' + data.error, 'bot'); return; }
-        addMessage(data.reply || 'No response.', 'bot', data.is_bad || false);
+        addMessage(data.reply || 'কিছু আসেনি।', 'bot', data.is_bad || false);
       } catch (e) {
         chatBox.removeChild(typingWrapper);
-        addMessage('❌ Server offline or API busy. Try again.', 'bot');
+        addMessage('❌ সার্ভার অফলাইন বা API ব্যস্ত। একটু পরে চেষ্টা করো।', 'bot');
       }
     }
 
