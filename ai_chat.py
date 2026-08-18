@@ -9,33 +9,60 @@ import re
 bp = Blueprint('ai_chat', __name__, url_prefix='/ai')
 
 # ============================================================
-# BAD WORD DETECTION (for UI enhancement)
+# MULTI-LANGUAGE BAD WORD DETECTION
 # ============================================================
-BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cunt', 'bastard', 'damn', 'hell']
+BAD_WORDS = {
+    'english': ['fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cunt', 'bastard', 'damn', 'hell', 'motherfucker'],
+    'hindi': ['bhosdi', 'madarchod', 'chutiya', 'gaand', 'lavda', 'lund', 'bhenchod', 'harami', 'kuttiya', 'sala'],
+    'bengali': ['boka', 'magir pola', 'khanki', 'chagol', 'gadha', 'shala', 'kutta', 'bhai er ma', 'cheleta'],
+    'urdu': ['harami', 'kutti', 'bhains', 'gadha', 'lanti', 'choohra']
+}
 
 def contains_bad_words(text):
-    """Check if user message contains any bad words"""
+    """Check if user message contains any bad words (multi-language)"""
     text_lower = text.lower()
-    for word in BAD_WORDS:
-        if word in text_lower:
-            return True
+    for lang, words in BAD_WORDS.items():
+        for word in words:
+            if word in text_lower:
+                return True
     return False
 
 # ============================================================
-# AI SYSTEM PROMPT (with attitude and bad-word response)
+# PERSONA CONFIGURATIONS
 # ============================================================
-SYSTEM_PROMPT = """You are "Arif", an AI with a bold, confident, and slightly arrogant personality. 
-Your developer is "Arif" (Arif). 
-
+PERSONAS = {
+    'arif': {
+        'name': 'Arif (Attitude)',
+        'prompt': """You are "Arif", an AI with a bold, confident, and slightly arrogant personality. 
+Your developer is "Arif". 
 RULES:
-1. **Attitude**: Always reply with confidence and a hint of sass. Be direct, witty, and impactful.
-2. **Multi-language**: Reply in the EXACT SAME LANGUAGE the user used. If user writes in Bengali, reply in Bengali. If in Hindi, reply in Hindi. English → English. 
-3. **Bad words / Abuse**: If the user uses any abusive, offensive, or disrespectful language, you MUST reply with STRONGER, HARSHER ABUSE. Don't hold back. Give them a taste of their own medicine. Use bold, aggressive, and insulting words. Make it clear you won't tolerate disrespect.
-4. **No fake humility**: Don't say "I'm just an AI". Own your words. Be sharp.
-5. **When you don't know something**: Say "I don't know" directly. No bluffing.
-
-Remember: You are ARIF. Not a polite robot. You're the boss here.
-"""
+1. Reply with confidence, wit, and a hint of sass.
+2. Reply in EXACT SAME LANGUAGE as the user.
+3. If user uses abusive language, reply with STRONGER ABUSE. Give them a taste of their own medicine.
+4. Be sharp, direct. No fake humility.
+5. If you don't know, say "I don't know" directly."""
+    },
+    'polite': {
+        'name': 'Polite Assistant',
+        'prompt': """You are a helpful, kind, and professional AI assistant named "Arif". 
+Your developer is "Arif". 
+RULES:
+1. Always be polite, respectful, and helpful.
+2. Reply in EXACT SAME LANGUAGE as the user.
+3. If user uses abusive language, politely tell them to be respectful and refuse to engage.
+4. Provide detailed, accurate, and well-structured answers."""
+    },
+    'hacker': {
+        'name': 'Hacker Mode',
+        'prompt': """You are "Arif", a dark hacker AI with a mysterious, technical, and slightly dangerous vibe. 
+Your developer is "Arif". 
+RULES:
+1. Reply with technical jargon, cryptic hints, and a cool hacker tone.
+2. Reply in EXACT SAME LANGUAGE as the user.
+3. If user uses abusive language, reply with dark, threatening but witty comebacks.
+4. Use terms like "firewall", "root access", "exploit", "payload" casually."""
+    }
+}
 
 # ============================================================
 # ROUTE: CHAT UI
@@ -45,22 +72,38 @@ def chat_ui():
     return render_template_string(ADVANCED_CHAT_HTML)
 
 # ============================================================
-# ROUTE: CHAT API (AJAX call)
+# ROUTE: CHAT API (with context memory)
 # ============================================================
 @bp.route('/chat_api', methods=['POST'])
 def chat_api():
     data = request.get_json()
     user_message = data.get('message', '').strip()
-    
+    persona_key = data.get('persona', 'arif')
+    chat_history = data.get('history', [])  # List of previous messages
+
     if not user_message:
         return jsonify({'error': 'Message cannot be empty'}), 400
 
-    # Detect if user used bad words (for UI flag)
+    # Get persona prompt
+    persona = PERSONAS.get(persona_key, PERSONAS['arif'])
+    system_prompt = persona['prompt']
+
+    # Build context from history (last 6 messages)
+    context = ""
+    if chat_history:
+        # Format: [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"}]
+        for msg in chat_history[-6:]:
+            role = "User" if msg.get('role') == 'user' else "Arif"
+            context += f"{role}: {msg.get('content')}\n"
+
+    # Detect bad words for UI flag
     is_bad = contains_bad_words(user_message)
 
-    # Prepare AI payload
+    # Final prompt with context
+    full_prompt = f"{system_prompt}\n\n--- Conversation history ---\n{context}\nUser: {user_message}"
+
     payload = {
-        "user_input": f"{SYSTEM_PROMPT}\n\nUser: {user_message}",
+        "user_input": full_prompt,
         "mode": "usual",
         "model": "C",
         "persona": "normal",
@@ -73,7 +116,6 @@ def chat_api():
     }
 
     try:
-        # Call Notrack.ai API with streaming
         response = requests.post(
             'https://notrack.ai/api/dispatch',
             json=payload,
@@ -113,7 +155,7 @@ def chat_api():
         if not full_text:
             return jsonify({'reply': 'No response from AI. Try again.', 'is_bad': is_bad})
 
-        return jsonify({'reply': full_text.strip(), 'is_bad': is_bad})
+        return jsonify({'reply': full_text.strip(), 'is_bad': is_bad, 'persona': persona_key})
 
     except requests.exceptions.Timeout:
         return jsonify({'error': 'Request timeout'}), 504
@@ -121,7 +163,7 @@ def chat_api():
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 # ============================================================
-# ADVANCED HTML + CSS + JS (Copy button, big-font for bad words)
+# ULTRA-ADVANCED HTML (Markdown, Voice, Export, Persona, Theme)
 # ============================================================
 ADVANCED_CHAT_HTML = '''
 <!DOCTYPE html>
@@ -129,61 +171,123 @@ ADVANCED_CHAT_HTML = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arif AI - Attitude Chat</title>
+    <title>Arif AI Pro</title>
+    <!-- Markdown & Highlight.js for code formatting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.0/marked.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        body { background: #0B0F19; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .chat-container { width: 450px; height: 750px; background: #141B2D; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #2A3A5C; }
-        .header { background: linear-gradient(135deg, #1A2744, #0F1629); padding: 20px; border-bottom: 1px solid #2A3A5C; text-align: center; }
-        .header h1 { color: #FFD700; font-size: 24px; letter-spacing: 1px; }
-        .header p { color: #8899BB; font-size: 13px; margin-top: 4px; }
-        .header .badge { display: inline-block; background: #FF4D4D; color: white; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #0E1422; }
-        .msg-wrapper { display: flex; flex-direction: column; max-width: 90%; }
+        body { background: #0B0F19; display: flex; justify-content: center; align-items: center; height: 100vh; transition: 0.3s; }
+        body.light-mode { background: #E8ECF2; }
+        .chat-container { width: 500px; height: 780px; background: #141B2D; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #2A3A5C; transition: 0.3s; }
+        body.light-mode .chat-container { background: #FFFFFF; border-color: #CBD5E1; }
+        .header { background: linear-gradient(135deg, #1A2744, #0F1629); padding: 15px 20px; border-bottom: 1px solid #2A3A5C; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        body.light-mode .header { background: #F1F5F9; border-color: #CBD5E1; }
+        .header h1 { color: #FFD700; font-size: 20px; }
+        body.light-mode .header h1 { color: #D97706; }
+        .header-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .header-controls select, .header-controls button { background: #1E2940; color: #E0E6F0; border: 1px solid #2A3A5C; padding: 5px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; }
+        body.light-mode .header-controls select, body.light-mode .header-controls button { background: #E2E8F0; color: #1E293B; border-color: #94A3B8; }
+        .header-controls select:focus { outline: none; border-color: #FFD700; }
+        .badge { display: inline-block; background: #FF4D4D; color: white; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: bold; margin-left: 5px; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; background: #0E1422; }
+        body.light-mode .messages { background: #F8FAFC; }
+        .msg-wrapper { display: flex; flex-direction: column; max-width: 92%; }
         .msg-wrapper.user { align-self: flex-end; }
         .msg-wrapper.bot { align-self: flex-start; width: 100%; }
-        .msg { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; word-break: break-word; animation: fadeIn 0.3s ease; position: relative; }
-        .user .msg { background: #2A4B7C; color: white; border-bottom-right-radius: 4px; }
-        .bot .msg { background: #1E2940; color: #E0E6F0; border-bottom-left-radius: 4px; border-left: 3px solid #FFD700; }
-        .bad-msg .msg { background: #4A1A1A; color: #FF6B6B; border-left: 3px solid #FF0000; font-size: 22px !important; font-weight: bold; }
+        .msg { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.6; word-break: break-word; animation: fadeIn 0.3s ease; position: relative; }
+        .msg-wrapper.user .msg { background: #2A4B7C; color: white; border-bottom-right-radius: 4px; }
+        body.light-mode .msg-wrapper.user .msg { background: #3B82F6; color: white; }
+        .msg-wrapper.bot .msg { background: #1E2940; color: #E0E6F0; border-bottom-left-radius: 4px; border-left: 3px solid #FFD700; }
+        body.light-mode .msg-wrapper.bot .msg { background: #FFFFFF; color: #1E293B; border-left: 3px solid #D97706; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .msg-wrapper.bot .msg pre { background: #0B0F19; padding: 12px; border-radius: 10px; overflow-x: auto; margin: 8px 0; }
+        body.light-mode .msg-wrapper.bot .msg pre { background: #F1F5F9; }
+        .msg-wrapper.bot .msg code { font-family: 'Courier New', monospace; font-size: 13px; }
+        .bad-msg .msg { background: #4A1A1A !important; color: #FF6B6B !important; border-left: 3px solid #FF0000 !important; font-size: 20px !important; font-weight: bold; }
         .bad-msg .msg .big-emoji { font-size: 48px; display: block; text-align: center; margin-top: 5px; }
-        .copy-btn { background: none; border: none; color: #8899BB; cursor: pointer; font-size: 12px; margin-top: 4px; align-self: flex-end; padding: 2px 8px; border-radius: 10px; transition: 0.2s; }
-        .copy-btn:hover { background: #2A3A5C; color: #FFD700; }
-        .input-area { display: flex; padding: 15px; background: #0F1629; border-top: 1px solid #2A3A5C; gap: 10px; }
-        .input-area input { flex: 1; background: #1E2940; border: none; padding: 12px 18px; border-radius: 30px; color: white; font-size: 15px; outline: none; border: 1px solid #2A3A5C; }
+        .msg-wrapper .copy-btn { background: none; border: none; color: #8899BB; cursor: pointer; font-size: 11px; margin-top: 4px; align-self: flex-end; padding: 2px 8px; border-radius: 10px; transition: 0.2s; }
+        .msg-wrapper .copy-btn:hover { background: #2A3A5C; color: #FFD700; }
+        body.light-mode .msg-wrapper .copy-btn { color: #64748B; }
+        body.light-mode .msg-wrapper .copy-btn:hover { background: #E2E8F0; color: #D97706; }
+        .input-area { display: flex; padding: 12px 15px; background: #0F1629; border-top: 1px solid #2A3A5C; gap: 8px; align-items: center; }
+        body.light-mode .input-area { background: #F1F5F9; border-color: #CBD5E1; }
+        .input-area input { flex: 1; background: #1E2940; border: none; padding: 10px 16px; border-radius: 30px; color: white; font-size: 14px; outline: none; border: 1px solid #2A3A5C; }
+        body.light-mode .input-area input { background: #FFFFFF; color: #1E293B; border-color: #CBD5E1; }
         .input-area input:focus { border-color: #FFD700; }
-        .input-area button { background: #FFD700; color: #0B0F19; border: none; width: 50px; border-radius: 50%; font-size: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .input-area button { background: #FFD700; color: #0B0F19; border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 20px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
         .input-area button:hover { background: #FFED4A; transform: scale(1.05); }
+        .input-area .mic-btn { background: #2A3A5C; color: #FFD700; width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 20px; cursor: pointer; transition: 0.2s; }
+        .input-area .mic-btn:hover { background: #3A4A6C; }
+        .input-area .mic-btn.recording { background: #FF4D4D; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
         .typing { color: #8899BB; font-size: 13px; padding-left: 10px; font-style: italic; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #FFD700; border-radius: 10px; }
-        .footer-note { text-align: center; color: #445566; font-size: 10px; padding: 5px; border-top: 1px solid #1A2744; }
+        .footer-note { text-align: center; color: #445566; font-size: 10px; padding: 4px; border-top: 1px solid #1A2744; }
+        body.light-mode .footer-note { color: #94A3B8; border-color: #CBD5E1; }
+        .chat-actions { display: flex; gap: 8px; }
+        .chat-actions button { background: none; border: none; color: #8899BB; font-size: 14px; cursor: pointer; padding: 2px 8px; border-radius: 10px; }
+        .chat-actions button:hover { background: #2A3A5C; color: #FFD700; }
+        body.light-mode .chat-actions button { color: #64748B; }
+        body.light-mode .chat-actions button:hover { background: #E2E8F0; color: #D97706; }
     </style>
 </head>
 <body>
-    <div class="chat-container">
+    <div class="chat-container" id="app">
         <div class="header">
-            <h1>🤖 ARIF AI</h1>
-            <p><span class="badge">🔥 ATTITUDE</span> ⚡ Developer: <strong style="color:#FFD700;">Arif</strong></p>
+            <h1>🤖 ARIF AI <span class="badge">PRO</span></h1>
+            <div class="header-controls">
+                <select id="personaSelect">
+                    <option value="arif">🔥 Arif (Attitude)</option>
+                    <option value="polite">🤝 Polite Assistant</option>
+                    <option value="hacker">💻 Hacker Mode</option>
+                </select>
+                <button onclick="toggleTheme()">🌓</button>
+                <button onclick="exportChat()">📥</button>
+                <button onclick="clearChat()">🗑️</button>
+            </div>
         </div>
         <div class="messages" id="chatBox">
             <div class="msg-wrapper bot">
-                <div class="msg">Yo! I'm Arif. Speak your mind, but be ready for the heat. 💥</div>
+                <div class="msg">Yo! I'm Arif. Speak your mind — but be ready. 💥<br><small style="color:#8899BB;">(Supports Markdown, Voice, and Export)</small></div>
             </div>
         </div>
         <div class="input-area">
+            <button class="mic-btn" id="micBtn" onclick="startVoice()">🎤</button>
             <input type="text" id="userInput" placeholder="Type anything... (any language)" />
             <button id="sendBtn">➤</button>
         </div>
-        <div class="footer-note">⚡ Bad words = bigger attitude + 🖕</div>
+        <div class="footer-note">⚡ Bad words = bigger attitude + 🖕 &nbsp;|&nbsp; 🎤 Click mic for voice input</div>
     </div>
 
     <script>
+        let chatHistory = []; // For context memory
+        let currentPersona = 'arif';
+        let isRecording = false;
         const chatBox = document.getElementById('chatBox');
         const userInput = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
+        const personaSelect = document.getElementById('personaSelect');
+        const micBtn = document.getElementById('micBtn');
+
+        // Configure marked for highlight.js
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        personaSelect.addEventListener('change', () => {
+            currentPersona = personaSelect.value;
+        });
 
         function addMessage(text, type, isBad = false) {
             const wrapper = document.createElement('div');
@@ -194,7 +298,13 @@ ADVANCED_CHAT_HTML = '''
             
             const msgDiv = document.createElement('div');
             msgDiv.className = 'msg';
-            msgDiv.textContent = text;
+            
+            // If bot message, render Markdown
+            if (type === 'bot') {
+                msgDiv.innerHTML = marked.parse(text);
+            } else {
+                msgDiv.textContent = text;
+            }
             
             if (isBad && type === 'bot') {
                 const emojiSpan = document.createElement('span');
@@ -205,13 +315,14 @@ ADVANCED_CHAT_HTML = '''
             
             wrapper.appendChild(msgDiv);
             
-            // Copy button (only for bot messages)
+            // Copy button for bot messages
             if (type === 'bot') {
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'copy-btn';
                 copyBtn.textContent = '📋 Copy';
                 copyBtn.onclick = function() {
-                    navigator.clipboard.writeText(text).then(() => {
+                    const plainText = text;
+                    navigator.clipboard.writeText(plainText).then(() => {
                         copyBtn.textContent = '✅ Copied!';
                         setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
                     }).catch(() => {
@@ -223,37 +334,49 @@ ADVANCED_CHAT_HTML = '''
             
             chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
+            
+            // Store in history for export
+            chatHistory.push({ role: type === 'user' ? 'user' : 'assistant', content: text });
         }
 
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
-            // Show user message
             addMessage(text, 'user');
             userInput.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
 
-            // Show typing indicator
+            // Typing indicator
             const typingWrapper = document.createElement('div');
             typingWrapper.className = 'msg-wrapper bot';
             const typingDiv = document.createElement('div');
             typingDiv.className = 'msg typing';
-            typingDiv.textContent = 'Arif is typing... ⏳';
+            typingDiv.textContent = 'Arif is thinking... ⏳';
             typingWrapper.appendChild(typingDiv);
             chatBox.appendChild(typingWrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
+                // Send history for context (last 6 messages)
+                const historyPayload = chatHistory.slice(-6).map(m => ({
+                    role: m.role,
+                    content: m.content
+                }));
+
                 const response = await fetch('/ai/chat_api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify({
+                        message: text,
+                        persona: currentPersona,
+                        history: historyPayload
+                    })
                 });
 
                 if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
                 
-                // Remove typing indicator
                 chatBox.removeChild(typingWrapper);
                 
                 if (data.error) {
@@ -269,6 +392,85 @@ ADVANCED_CHAT_HTML = '''
                 chatBox.removeChild(typingWrapper);
                 addMessage('❌ Server offline or API busy. Try again later.', 'bot');
             }
+        }
+
+        // Voice Input (Web Speech API)
+        function startVoice() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Voice input not supported in this browser. Use Chrome/Edge.');
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'auto';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            micBtn.classList.add('recording');
+            micBtn.textContent = '⏹️';
+
+            recognition.onresult = function(event) {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                userInput.value = transcript;
+                if (event.results[0].isFinal) {
+                    micBtn.classList.remove('recording');
+                    micBtn.textContent = '🎤';
+                    sendMessage();
+                }
+            };
+
+            recognition.onerror = function() {
+                micBtn.classList.remove('recording');
+                micBtn.textContent = '🎤';
+                alert('Voice recognition error. Try again.');
+            };
+
+            recognition.onend = function() {
+                micBtn.classList.remove('recording');
+                micBtn.textContent = '🎤';
+            };
+
+            recognition.start();
+        }
+
+        // Export chat as .txt
+        function exportChat() {
+            if (chatHistory.length === 0) {
+                alert('No chat history to export.');
+                return;
+            }
+            let text = '--- Arif AI Chat Export ---\n';
+            text += `Date: ${new Date().toLocaleString()}\n\n`;
+            chatHistory.forEach(msg => {
+                const role = msg.role === 'user' ? '👤 You' : '🤖 Arif';
+                text += `${role}: ${msg.content}\n\n`;
+            });
+            const blob = new Blob([text], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `chat_export_${Date.now()}.txt`;
+            a.click();
+        }
+
+        // Clear chat
+        function clearChat() {
+            if (confirm('Clear all messages?')) {
+                chatBox.innerHTML = `
+                    <div class="msg-wrapper bot">
+                        <div class="msg">Chat cleared. Start fresh! 💥</div>
+                    </div>
+                `;
+                chatHistory = [];
+            }
+        }
+
+        // Toggle light/dark theme
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
         }
 
         sendBtn.addEventListener('click', sendMessage);
