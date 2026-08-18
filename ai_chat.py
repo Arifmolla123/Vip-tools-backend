@@ -1,47 +1,29 @@
 from flask import Blueprint, request, jsonify, render_template_string
 import requests
 import json
-import re
 
-# ============================================================
-# BLUEPRINT INITIALIZATION
-# ============================================================
 bp = Blueprint('ai_chat', __name__, url_prefix='/ai')
 
-# ============================================================
-# TEST ROUTE
-# ============================================================
 @bp.route('/test')
 def test():
     return jsonify({'status': 'ok', 'message': 'AI Chat is working!'})
 
-# ============================================================
-# BAD WORD DETECTION (Multi-language)
-# ============================================================
+# ===== বাজে শব্দ ডিটেক্ট =====
 BAD_WORDS = [
-    'fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cunt', 'bastard', 'damn', 'hell',
-    'motherfucker', 'bhosdi', 'madarchod', 'chutiya', 'gaand', 'lavda', 'lund', 'bhenchod',
-    'harami', 'kuttiya', 'sala', 'boka', 'khanki', 'chagol', 'gadha', 'shala', 'kutta',
-    'gublu', 'choot', 'fuk', 'idiot', 'stupid', 'bkc'
+    'fuck','shit','bitch','asshole','dick','pussy','cunt','bastard','damn','hell',
+    'motherfucker','bhosdi','madarchod','chutiya','gaand','lavda','lund','bhenchod',
+    'harami','kuttiya','sala','boka','khanki','chagol','gadha','shala','kutta',
+    'gublu','choot','fuk','idiot','stupid','bkc'
 ]
 
 def contains_bad_words(text):
-    text_lower = text.lower()
-    for word in BAD_WORDS:
-        if word in text_lower:
-            return True
-    return False
+    t = text.lower()
+    return any(w in t for w in BAD_WORDS)
 
-# ============================================================
-# ROUTE: CHAT UI (HTML এম্বেডেড)
-# ============================================================
 @bp.route('/')
 def chat_ui():
-    return render_template_string(CHAT_HTML)
+    return render_template_string(HTML)
 
-# ============================================================
-# ROUTE: CHAT API
-# ============================================================
 @bp.route('/chat_api', methods=['POST'])
 def chat_api():
     data = request.get_json()
@@ -51,25 +33,22 @@ def chat_api():
     if not user_message:
         return jsonify({'error': 'Message cannot be empty'}), 400
 
-    # System prompt with attitude + bad word handling
-    SYSTEM_PROMPT = """You are "Arif" – a bold, confident, and sharp AI. Your developer is "Arif".
-
+    SYSTEM_PROMPT = """You are "Arif" – bold, confident, sharp. Developer: Arif.
 RULES:
-1. Reply with **attitude** – be direct, witty, and a bit arrogant. No fake humility.
-2. Reply in the **EXACT SAME LANGUAGE** the user used.
-3. If the user uses abusive/bad words, reply with **STRONGER, HARSHER ABUSE**. Give them a taste of their own medicine.
-4. If you don't know something, say "I don't know" – no bluffing.
-5. Keep your replies concise, impactful, and interesting.
+1. Reply with attitude – direct, witty, a bit arrogant.
+2. Reply in the EXACT SAME LANGUAGE as the user.
+3. If user abuses, reply with STRONGER ABUSE.
+4. If you don't know, say "I don't know".
+5. Keep replies concise and impactful.
 """
 
-    # Build context from history (last 6 messages)
     context = ""
     if chat_history:
         for msg in chat_history[-6:]:
-            role = "User" if msg.get('role') == 'user' else "Arif"
-            context += f"{role}: {msg.get('content')}\n"
+            role = "User" if msg['role'] == 'user' else "Arif"
+            context += f"{role}: {msg['content']}\n"
 
-    full_prompt = f"{SYSTEM_PROMPT}\n\n--- Previous conversation ---\n{context}\nUser: {user_message}"
+    full_prompt = f"{SYSTEM_PROMPT}\n\n--- History ---\n{context}\nUser: {user_message}"
 
     payload = {
         "user_input": full_prompt,
@@ -85,481 +64,293 @@ RULES:
     }
 
     try:
-        response = requests.post(
+        resp = requests.post(
             'https://notrack.ai/api/dispatch',
             json=payload,
             headers={
                 'Content-Type': 'application/json',
                 'Origin': 'https://notrack.ai',
                 'Referer': 'https://notrack.ai/chat',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0'
             },
             timeout=60,
             stream=True
         )
 
-        if response.status_code != 200:
+        if resp.status_code != 200:
             return jsonify({'error': 'AI server error'}), 500
 
-        # Parse streaming response
-        full_text = ''
-        buffer = ''
-        for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+        full = ''
+        buf = ''
+        for chunk in resp.iter_content(chunk_size=None, decode_unicode=True):
             if chunk:
-                buffer += chunk
-                parts = buffer.split('\n\n')
-                buffer = parts.pop()
+                buf += chunk
+                parts = buf.split('\n\n')
+                buf = parts.pop()
                 for part in parts:
                     if part.startswith('data: '):
-                        json_str = part[6:].strip()
-                        if not json_str:
+                        raw = part[6:].strip()
+                        if not raw:
                             continue
                         try:
-                            data_chunk = json.loads(json_str)
-                            if data_chunk.get('type') == 'delta' and data_chunk.get('chunk'):
-                                full_text += data_chunk['chunk']
+                            d = json.loads(raw)
+                            if d.get('type') == 'delta' and d.get('chunk'):
+                                full += d['chunk']
                         except:
                             pass
 
-        if not full_text:
-            return jsonify({'reply': 'No response from AI. Try again.', 'is_bad': False})
+        if not full:
+            return jsonify({'reply': 'No response. Try again.', 'is_bad': False})
 
-        is_bad = contains_bad_words(user_message)
-        return jsonify({'reply': full_text.strip(), 'is_bad': is_bad})
+        return jsonify({
+            'reply': full.strip(),
+            'is_bad': contains_bad_words(user_message)
+        })
 
     except requests.exceptions.Timeout:
-        return jsonify({'error': 'Request timeout'}), 504
+        return jsonify({'error': 'Timeout'}), 504
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
-# ============================================================
-# EMBBEDED HTML (Fully styled, all features)
-# ============================================================
-CHAT_HTML = '''
+# ===================== এম্বেডেড HTML (ডার্ক/লাইট + ফুল স্ক্রিন) =====================
+HTML = '''
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Arif AI - Attitude</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background: #0B0F19;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-            margin: 0;
-        }
-        .chat-container {
-            width: 460px;
-            height: 760px;
-            background: #141B2D;
-            border-radius: 40px;
-            box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,215,0,0.1);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border: 1px solid #2A3A5C;
-        }
-        .header {
-            background: linear-gradient(135deg, #1A2744, #0F1629);
-            padding: 22px 20px 16px;
-            border-bottom: 1px solid #2A3A5C;
-            text-align: center;
-            position: relative;
-        }
-        .header::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 20%;
-            width: 60%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #FFD700, transparent);
-            border-radius: 10px;
-        }
-        .header h1 {
-            color: #FFD700;
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: 3px;
-            text-shadow: 0 0 20px rgba(255,215,0,0.3);
-        }
-        .header p {
-            color: #8899BB;
-            font-size: 13px;
-            margin-top: 4px;
-            letter-spacing: 1px;
-        }
-        .header .badge {
-            display: inline-block;
-            background: #FF4D4D;
-            color: #fff;
-            padding: 3px 14px;
-            border-radius: 30px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-right: 4px;
-            vertical-align: middle;
-        }
-        .header .dev-name {
-            color: #FFD700;
-            font-weight: 700;
-        }
-        .messages {
-            flex: 1;
-            padding: 20px 18px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            background: #0E1422;
-        }
-        .msg-wrapper {
-            display: flex;
-            flex-direction: column;
-            max-width: 92%;
-            animation: slideUp 0.3s ease;
-        }
-        .msg-wrapper.user {
-            align-self: flex-end;
-        }
-        .msg-wrapper.bot {
-            align-self: flex-start;
-            width: 100%;
-        }
-        .msg {
-            padding: 12px 18px;
-            border-radius: 22px;
-            font-size: 15px;
-            line-height: 1.6;
-            word-break: break-word;
-            position: relative;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-        .user .msg {
-            background: #2A4B7C;
-            color: #FFFFFF;
-            border-bottom-right-radius: 6px;
-        }
-        .bot .msg {
-            background: #1E2940;
-            color: #E0E6F0;
-            border-bottom-left-radius: 6px;
-            border-left: 4px solid #FFD700;
-        }
-        .bad-msg .msg {
-            background: #4A1A1A !important;
-            color: #FF6B6B !important;
-            border-left: 4px solid #FF0000 !important;
-            font-size: 22px !important;
-            font-weight: 800 !important;
-            text-shadow: 0 0 10px rgba(255,0,0,0.3);
-        }
-        .bad-msg .msg .big-emoji {
-            font-size: 52px;
-            display: block;
-            text-align: center;
-            margin-top: 8px;
-            animation: shake 0.5s ease infinite;
-        }
-        @keyframes shake {
-            0%,100% { transform: rotate(0deg); }
-            25% { transform: rotate(15deg); }
-            75% { transform: rotate(-15deg); }
-        }
-        .copy-btn {
-            background: none;
-            border: none;
-            color: #5A6A8A;
-            cursor: pointer;
-            font-size: 11px;
-            margin-top: 6px;
-            align-self: flex-end;
-            padding: 4px 12px;
-            border-radius: 20px;
-            transition: 0.3s;
-            font-weight: 500;
-        }
-        .copy-btn:hover {
-            background: #2A3A5C;
-            color: #FFD700;
-        }
-        .typing {
-            color: #8899BB;
-            font-size: 13px;
-            padding-left: 6px;
-            font-style: italic;
-        }
-        .input-area {
-            display: flex;
-            padding: 14px 18px;
-            background: #0F1629;
-            border-top: 1px solid #2A3A5C;
-            gap: 12px;
-            align-items: center;
-        }
-        .input-area input {
-            flex: 1;
-            background: #1E2940;
-            border: none;
-            padding: 14px 20px;
-            border-radius: 40px;
-            color: #FFFFFF;
-            font-size: 15px;
-            outline: none;
-            border: 1px solid #2A3A5C;
-            transition: 0.3s;
-        }
-        .input-area input:focus {
-            border-color: #FFD700;
-            box-shadow: 0 0 15px rgba(255,215,0,0.1);
-        }
-        .input-area input::placeholder {
-            color: #5A6A8A;
-            font-weight: 300;
-        }
-        .input-area button {
-            background: #FFD700;
-            color: #0B0F19;
-            border: none;
-            width: 52px;
-            height: 52px;
-            border-radius: 50%;
-            font-size: 24px;
-            font-weight: 900;
-            cursor: pointer;
-            transition: 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 0 20px rgba(255,215,0,0.15);
-        }
-        .input-area button:hover {
-            background: #FFED4A;
-            transform: scale(1.06);
-            box-shadow: 0 0 30px rgba(255,215,0,0.3);
-        }
-        .input-area .mic-btn {
-            background: #2A3A5C;
-            color: #FFD700;
-            width: 52px;
-            height: 52px;
-            border-radius: 50%;
-            border: none;
-            font-size: 22px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .input-area .mic-btn:hover {
-            background: #3A4A6C;
-        }
-        .input-area .mic-btn.recording {
-            background: #FF4D4D;
-            color: #FFFFFF;
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        .footer-note {
-            text-align: center;
-            color: #3A4A6A;
-            font-size: 10px;
-            padding: 8px;
-            border-top: 1px solid #1A2744;
-            letter-spacing: 0.5px;
-        }
-        .footer-note span {
-            color: #FFD700;
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        ::-webkit-scrollbar {
-            width: 5px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #FFD700;
-            border-radius: 20px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #FFED4A;
-        }
-        @media (max-width: 500px) {
-            .chat-container {
-                width: 100%;
-                height: 95vh;
-                border-radius: 24px;
-            }
-            .header h1 {
-                font-size: 22px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Arif AI</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
+    body {
+      height:100vh; width:100vw; overflow:hidden;
+      display:flex; justify-content:center; align-items:center;
+      background:#0B0F19; transition:background 0.4s;
+    }
+    body.light { background:#F0F4FF; }
+    .chat-container {
+      width:100%; height:100%; max-width:480px; max-height:900px;
+      background:#141B2D; border-radius:36px; border:1px solid #2A3A5C;
+      display:flex; flex-direction:column; overflow:hidden;
+      box-shadow:0 30px 80px rgba(0,0,0,0.7); transition:0.3s;
+    }
+    body.light .chat-container {
+      background:#FFFFFF; border-color:#CBD5E1; box-shadow:0 20px 60px rgba(0,0,0,0.08);
+    }
+    .header {
+      background:linear-gradient(145deg,#1A2744,#0F1629); padding:18px 22px 14px;
+      border-bottom:1px solid #2A3A5C; display:flex; justify-content:space-between; align-items:center;
+      flex-shrink:0; transition:0.3s;
+    }
+    body.light .header { background:#F8FAFC; border-color:#E2E8F0; }
+    .header h1 { color:#FFD700; font-size:24px; font-weight:800; letter-spacing:1px; }
+    body.light .header h1 { color:#D97706; }
+    .header .sub { font-size:11px; color:#8899BB; }
+    body.light .header .sub { color:#475569; }
+    .header .sub span { color:#FFD700; font-weight:600; }
+    body.light .header .sub span { color:#D97706; }
+    .theme-toggle {
+      background:rgba(255,215,0,0.12); border:1px solid rgba(255,215,0,0.2);
+      color:#FFD700; width:38px; height:38px; border-radius:30px; font-size:18px;
+      cursor:pointer; transition:0.3s; display:flex; align-items:center; justify-content:center;
+    }
+    .theme-toggle:hover { background:rgba(255,215,0,0.25); transform:scale(1.05); }
+    .messages {
+      flex:1; padding:18px 16px 10px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+      background:#0E1422; transition:0.3s;
+    }
+    body.light .messages { background:#F1F5F9; }
+    .msg-wrapper { display:flex; flex-direction:column; max-width:88%; animation:slideUp 0.3s ease; }
+    .msg-wrapper.user { align-self:flex-end; }
+    .msg-wrapper.bot { align-self:flex-start; width:100%; }
+    .msg { padding:12px 18px; border-radius:22px; font-size:15px; line-height:1.6; word-break:break-word; box-shadow:0 2px 6px rgba(0,0,0,0.15); }
+    .user .msg { background:#2A4B7C; color:#fff; border-bottom-right-radius:6px; }
+    body.light .user .msg { background:#3B82F6; }
+    .bot .msg { background:#1E2940; color:#E0E6F0; border-bottom-left-radius:6px; border-left:4px solid #FFD700; }
+    body.light .bot .msg { background:#fff; color:#1E293B; border-left-color:#D97706; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+    .bad-msg .msg { background:#4A1A1A !important; color:#FF6B6B !important; border-left-color:#FF0000 !important; font-size:20px !important; font-weight:700 !important; }
+    body.light .bad-msg .msg { background:#FEE2E2 !important; color:#991B1B !important; }
+    .bad-msg .msg .big-emoji { font-size:48px; display:block; text-align:center; margin-top:6px; animation:shake 0.6s infinite; }
+    @keyframes shake { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(12deg)} 75%{transform:rotate(-12deg)} }
+    .copy-btn { background:none; border:none; color:#5A6A8A; font-size:11px; margin-top:4px; align-self:flex-end; padding:2px 12px; border-radius:20px; cursor:pointer; transition:0.3s; font-weight:500; }
+    .copy-btn:hover { background:#2A3A5C; color:#FFD700; }
+    body.light .copy-btn { color:#94A3B8; }
+    body.light .copy-btn:hover { background:#E2E8F0; color:#D97706; }
+    .typing { color:#8899BB; font-size:13px; padding-left:6px; font-style:italic; }
+    .input-area {
+      display:flex; padding:12px 16px 16px; background:#0F1629; border-top:1px solid #2A3A5C;
+      gap:10px; align-items:center; flex-shrink:0; transition:0.3s;
+    }
+    body.light .input-area { background:#F8FAFC; border-color:#E2E8F0; }
+    .input-area input {
+      flex:1; background:#1E2940; border:none; padding:14px 18px; border-radius:40px;
+      color:#fff; font-size:15px; outline:none; border:1px solid #2A3A5C; transition:0.3s;
+    }
+    body.light .input-area input { background:#fff; color:#1E293B; border-color:#CBD5E1; }
+    .input-area input:focus { border-color:#FFD700; box-shadow:0 0 16px rgba(255,215,0,0.08); }
+    body.light .input-area input:focus { border-color:#D97706; }
+    .input-area input::placeholder { color:#5A6A8A; font-weight:300; }
+    .input-area button {
+      background:#FFD700; color:#0B0F19; border:none; width:50px; height:50px; border-radius:50%;
+      font-size:24px; font-weight:700; cursor:pointer; transition:0.3s;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      box-shadow:0 0 24px rgba(255,215,0,0.12);
+    }
+    .input-area button:hover { background:#FFED4A; transform:scale(1.04); }
+    body.light .input-area button { background:#D97706; color:#fff; }
+    .input-area .mic-btn {
+      background:#2A3A5C; color:#FFD700; width:50px; height:50px; border-radius:50%;
+      border:none; font-size:22px; cursor:pointer; transition:0.3s; flex-shrink:0;
+    }
+    body.light .input-area .mic-btn { background:#E2E8F0; color:#D97706; }
+    .input-area .mic-btn:hover { background:#3A4A6C; }
+    body.light .input-area .mic-btn:hover { background:#CBD5E1; }
+    .input-area .mic-btn.recording { background:#FF4D4D; color:#fff; animation:pulse 1s infinite; }
+    @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.08)} 100%{transform:scale(1)} }
+    .footer-note {
+      text-align:center; color:#3A4A6A; font-size:10px; padding:6px;
+      border-top:1px solid #1A2744; flex-shrink:0; transition:0.3s;
+    }
+    body.light .footer-note { color:#94A3B8; border-color:#E2E8F0; }
+    .footer-note span { color:#FFD700; }
+    body.light .footer-note span { color:#D97706; }
+    @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#FFD700; border-radius:20px; }
+    @media (max-width:500px) {
+      .chat-container { border-radius:0; max-width:100%; max-height:100%; border:none; box-shadow:none; }
+      .header h1 { font-size:20px; }
+      .input-area input { font-size:14px; padding:12px 14px; }
+      .input-area button, .input-area .mic-btn { width:44px; height:44px; font-size:20px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="header">
-            <h1>🤖 ARIF</h1>
-            <p><span class="badge">⚡ Attitude</span> Developer: <span class="dev-name">Arif</span></p>
-        </div>
-        <div class="messages" id="chatBox">
-            <div class="msg-wrapper bot">
-                <div class="msg">Yo! I'm Arif. Speak your mind – I'll match your energy. 💥</div>
-            </div>
-        </div>
-        <div class="input-area">
-            <button class="mic-btn" id="micBtn" onclick="startVoice()" title="Voice Input">🎤</button>
-            <input type="text" id="userInput" placeholder="Ask anything... (any language)" />
-            <button id="sendBtn" title="Send">➤</button>
-        </div>
-        <div class="footer-note">
-            🔥 Bad words = bigger attitude + <span>🖕</span> &nbsp;·&nbsp; 🎤 Voice ready
-        </div>
+  <div class="chat-container">
+    <div class="header">
+      <div><h1>🤖 ARIF</h1><div class="sub"><span>⚡ Attitude</span> · Developer: Arif</div></div>
+      <button class="theme-toggle" id="themeToggle" title="Toggle Theme">🌓</button>
     </div>
+    <div class="messages" id="chatBox">
+      <div class="msg-wrapper bot"><div class="msg">Yo! I'm Arif. Speak your mind – I'll match your energy. 💥</div></div>
+    </div>
+    <div class="input-area">
+      <button class="mic-btn" id="micBtn" title="Voice Input">🎤</button>
+      <input type="text" id="userInput" placeholder="Ask anything... (any language)" />
+      <button id="sendBtn" title="Send">➤</button>
+    </div>
+    <div class="footer-note">🔥 Bad words = bigger attitude + <span>🖕</span> &nbsp;·&nbsp; 🎤 Voice ready</div>
+  </div>
 
-    <script>
-        const chatBox = document.getElementById('chatBox');
-        const userInput = document.getElementById('userInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const micBtn = document.getElementById('micBtn');
-        let chatHistory = [];
+  <script>
+    const chatBox = document.getElementById('chatBox');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const micBtn = document.getElementById('micBtn');
+    const themeToggle = document.getElementById('themeToggle');
+    let history = [];
 
-        function addMessage(text, type, isBad = false) {
-            const wrapper = document.createElement('div');
-            wrapper.className = `msg-wrapper ${type}`;
-            if (isBad && type === 'bot') {
-                wrapper.classList.add('bad-msg');
-            }
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'msg';
-            msgDiv.textContent = text;
-            if (isBad && type === 'bot') {
-                const emojiSpan = document.createElement('span');
-                emojiSpan.className = 'big-emoji';
-                emojiSpan.textContent = '🖕';
-                msgDiv.appendChild(emojiSpan);
-            }
-            wrapper.appendChild(msgDiv);
-            if (type === 'bot') {
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'copy-btn';
-                copyBtn.textContent = '📋 Copy';
-                copyBtn.onclick = function() {
-                    navigator.clipboard.writeText(text).then(() => {
-                        copyBtn.textContent = '✅ Copied!';
-                        setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
-                    }).catch(() => {
-                        copyBtn.textContent = '❌ Failed';
-                    });
-                };
-                wrapper.appendChild(copyBtn);
-            }
-            chatBox.appendChild(wrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            chatHistory.push({ role: type === 'user' ? 'user' : 'assistant', content: text });
-        }
+    themeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('light');
+      themeToggle.textContent = document.body.classList.contains('light') ? '🌙' : '🌓';
+    });
 
-        async function sendMessage() {
-            const text = userInput.value.trim();
-            if (!text) return;
-            addMessage(text, 'user');
-            userInput.value = '';
-            const typingWrapper = document.createElement('div');
-            typingWrapper.className = 'msg-wrapper bot';
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'msg typing';
-            typingDiv.textContent = 'Arif is thinking... ⏳';
-            typingWrapper.appendChild(typingDiv);
-            chatBox.appendChild(typingWrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            try {
-                const historyPayload = chatHistory.slice(-6).map(m => ({
-                    role: m.role,
-                    content: m.content
-                }));
-                const response = await fetch('/ai/chat_api', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: text,
-                        history: historyPayload
-                    })
-                });
-                if (!response.ok) throw new Error('Network error');
-                const data = await response.json();
-                chatBox.removeChild(typingWrapper);
-                if (data.error) {
-                    addMessage('❌ ' + data.error, 'bot');
-                    return;
-                }
-                const reply = data.reply || 'No response from AI.';
-                const isBad = data.is_bad || false;
-                addMessage(reply, 'bot', isBad);
-            } catch (error) {
-                chatBox.removeChild(typingWrapper);
-                addMessage('❌ Server offline or API busy. Try again later.', 'bot');
-            }
-        }
+    function addMessage(text, type, isBad = false) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `msg-wrapper ${type}`;
+      if (isBad && type === 'bot') wrapper.classList.add('bad-msg');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'msg';
+      msgDiv.textContent = text;
+      if (isBad && type === 'bot') {
+        const emoji = document.createElement('span');
+        emoji.className = 'big-emoji';
+        emoji.textContent = '🖕';
+        msgDiv.appendChild(emoji);
+      }
+      wrapper.appendChild(msgDiv);
+      if (type === 'bot') {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = '📋 Copy';
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = '✅ Copied!';
+            setTimeout(() => copyBtn.textContent = '📋 Copy', 2000);
+          }).catch(() => copyBtn.textContent = '❌ Failed');
+        };
+        wrapper.appendChild(copyBtn);
+      }
+      chatBox.appendChild(wrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      history.push({ role: type === 'user' ? 'user' : 'assistant', content: text });
+    }
 
-        function startVoice() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert('Voice input not supported in this browser. Use Chrome/Edge.');
-                return;
-            }
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'auto';
-            recognition.continuous = false;
-            recognition.interimResults = true;
-            micBtn.classList.add('recording');
-            micBtn.textContent = '⏹️';
-            recognition.onresult = function(event) {
-                let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    transcript += event.results[i][0].transcript;
-                }
-                userInput.value = transcript;
-                if (event.results[0].isFinal) {
-                    micBtn.classList.remove('recording');
-                    micBtn.textContent = '🎤';
-                    sendMessage();
-                }
-            };
-            recognition.onerror = function() {
-                micBtn.classList.remove('recording');
-                micBtn.textContent = '🎤';
-                alert('Voice recognition error. Try again.');
-            };
-            recognition.onend = function() {
-                micBtn.classList.remove('recording');
-                micBtn.textContent = '🎤';
-            };
-            recognition.start();
-        }
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
+      addMessage(text, 'user');
+      userInput.value = '';
 
-        sendBtn.addEventListener('click', sendMessage);
-        userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+      const typingWrapper = document.createElement('div');
+      typingWrapper.className = 'msg-wrapper bot';
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'msg typing';
+      typingDiv.textContent = 'Arif is thinking... ⏳';
+      typingWrapper.appendChild(typingDiv);
+      chatBox.appendChild(typingWrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const hist = history.slice(-6).map(m => ({ role: m.role, content: m.content }));
+        const res = await fetch('/ai/chat_api', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, history: hist })
         });
-    </script>
+        if (!res.ok) throw new Error('Network error');
+        const data = await res.json();
+        chatBox.removeChild(typingWrapper);
+        if (data.error) { addMessage('❌ ' + data.error, 'bot'); return; }
+        addMessage(data.reply || 'No response.', 'bot', data.is_bad || false);
+      } catch (e) {
+        chatBox.removeChild(typingWrapper);
+        addMessage('❌ Server offline or API busy. Try again.', 'bot');
+      }
+    }
+
+    function startVoice() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Voice not supported. Use Chrome/Edge.');
+        return;
+      }
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const rec = new SR();
+      rec.lang = 'auto';
+      rec.interimResults = true;
+      micBtn.classList.add('recording');
+      micBtn.textContent = '⏹️';
+      rec.onresult = (e) => {
+        let t = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+        userInput.value = t;
+        if (e.results[0].isFinal) {
+          micBtn.classList.remove('recording');
+          micBtn.textContent = '🎤';
+          sendMessage();
+        }
+      };
+      rec.onerror = () => { micBtn.classList.remove('recording'); micBtn.textContent = '🎤'; alert('Voice error.'); };
+      rec.onend = () => { micBtn.classList.remove('recording'); micBtn.textContent = '🎤'; };
+      rec.start();
+    }
+
+    micBtn.addEventListener('click', startVoice);
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+  </script>
 </body>
 </html>
 '''
