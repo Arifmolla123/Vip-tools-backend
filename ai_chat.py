@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, render_template_string
 import requests
 import json
 import re
+import time
 
 # ============================================================
 # BLUEPRINT INITIALIZATION
@@ -9,13 +10,20 @@ import re
 bp = Blueprint('ai_chat', __name__, url_prefix='/ai')
 
 # ============================================================
+# TEST ROUTE (to check if blueprint is loaded)
+# ============================================================
+@bp.route('/test')
+def test():
+    return jsonify({'status': 'ok', 'message': 'AI Chat blueprint is working!'})
+
+# ============================================================
 # MULTI-LANGUAGE BAD WORD DETECTION
 # ============================================================
 BAD_WORDS = {
-    'english': ['fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cunt', 'bastard', 'damn', 'hell', 'motherfucker'],
-    'hindi': ['bhosdi', 'madarchod', 'chutiya', 'gaand', 'lavda', 'lund', 'bhenchod', 'harami', 'kuttiya', 'sala'],
-    'bengali': ['boka', 'magir pola', 'khanki', 'chagol', 'gadha', 'shala', 'kutta', 'bhai er ma', 'cheleta'],
-    'urdu': ['harami', 'kutti', 'bhains', 'gadha', 'lanti', 'choohra']
+    'english': ['fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cunt', 'bastard', 'damn', 'hell', 'motherfucker', 'fuk', 'shutup', 'stupid', 'idiot'],
+    'hindi': ['bhosdi', 'madarchod', 'chutiya', 'gaand', 'lavda', 'lund', 'bhenchod', 'harami', 'kuttiya', 'sala', 'bkc'],
+    'bengali': ['boka', 'magir pola', 'khanki', 'chagol', 'gadha', 'shala', 'kutta', 'bhai er ma', 'cheleta', 'kharap', 'gublu'],
+    'urdu': ['harami', 'kutti', 'bhains', 'gadha', 'lanti', 'choohra', 'bhenchod', 'choot']
 }
 
 def contains_bad_words(text):
@@ -33,8 +41,7 @@ def contains_bad_words(text):
 PERSONAS = {
     'arif': {
         'name': 'Arif (Attitude)',
-        'prompt': """You are "Arif", an AI with a bold, confident, and slightly arrogant personality. 
-Your developer is "Arif". 
+        'prompt': """You are "Arif", an AI with a bold, confident, and slightly arrogant personality. Your developer is "Arif". 
 RULES:
 1. Reply with confidence, wit, and a hint of sass.
 2. Reply in EXACT SAME LANGUAGE as the user.
@@ -44,8 +51,7 @@ RULES:
     },
     'polite': {
         'name': 'Polite Assistant',
-        'prompt': """You are a helpful, kind, and professional AI assistant named "Arif". 
-Your developer is "Arif". 
+        'prompt': """You are a helpful, kind, and professional AI assistant named "Arif". Your developer is "Arif". 
 RULES:
 1. Always be polite, respectful, and helpful.
 2. Reply in EXACT SAME LANGUAGE as the user.
@@ -54,8 +60,7 @@ RULES:
     },
     'hacker': {
         'name': 'Hacker Mode',
-        'prompt': """You are "Arif", a dark hacker AI with a mysterious, technical, and slightly dangerous vibe. 
-Your developer is "Arif". 
+        'prompt': """You are "Arif", a dark hacker AI with a mysterious, technical, and slightly dangerous vibe. Your developer is "Arif". 
 RULES:
 1. Reply with technical jargon, cryptic hints, and a cool hacker tone.
 2. Reply in EXACT SAME LANGUAGE as the user.
@@ -79,10 +84,12 @@ def chat_api():
     data = request.get_json()
     user_message = data.get('message', '').strip()
     persona_key = data.get('persona', 'arif')
-    chat_history = data.get('history', [])  # List of previous messages
+    chat_history = data.get('history', [])
 
     if not user_message:
         return jsonify({'error': 'Message cannot be empty'}), 400
+
+    print(f"📩 Received: {user_message}")  # Render log-এ দেখাবে
 
     # Get persona prompt
     persona = PERSONAS.get(persona_key, PERSONAS['arif'])
@@ -91,15 +98,11 @@ def chat_api():
     # Build context from history (last 6 messages)
     context = ""
     if chat_history:
-        # Format: [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"}]
         for msg in chat_history[-6:]:
             role = "User" if msg.get('role') == 'user' else "Arif"
             context += f"{role}: {msg.get('content')}\n"
 
-    # Detect bad words for UI flag
     is_bad = contains_bad_words(user_message)
-
-    # Final prompt with context
     full_prompt = f"{system_prompt}\n\n--- Conversation history ---\n{context}\nUser: {user_message}"
 
     payload = {
@@ -130,6 +133,7 @@ def chat_api():
         )
 
         if response.status_code != 200:
+            print(f"❌ API Error: {response.status_code}")
             return jsonify({'error': 'AI server error'}), 500
 
         # Parse streaming response
@@ -146,24 +150,28 @@ def chat_api():
                         if not json_str:
                             continue
                         try:
-                            data = json.loads(json_str)
-                            if data.get('type') == 'delta' and data.get('chunk'):
-                                full_text += data['chunk']
+                            data_chunk = json.loads(json_str)
+                            if data_chunk.get('type') == 'delta' and data_chunk.get('chunk'):
+                                full_text += data_chunk['chunk']
                         except:
                             pass
 
         if not full_text:
+            print("⚠️ Empty response from AI")
             return jsonify({'reply': 'No response from AI. Try again.', 'is_bad': is_bad})
 
+        print(f"✅ Response: {full_text[:100]}...")
         return jsonify({'reply': full_text.strip(), 'is_bad': is_bad, 'persona': persona_key})
 
     except requests.exceptions.Timeout:
+        print("⏰ Timeout")
         return jsonify({'error': 'Request timeout'}), 504
     except Exception as e:
+        print(f"💥 Error: {str(e)}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 # ============================================================
-# ULTRA-ADVANCED HTML (Markdown, Voice, Export, Persona, Theme)
+# ULTRA-ADVANCED HTML (Stable version with all features)
 # ============================================================
 ADVANCED_CHAT_HTML = '''
 <!DOCTYPE html>
@@ -172,7 +180,6 @@ ADVANCED_CHAT_HTML = '''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arif AI Pro</title>
-    <!-- Markdown & Highlight.js for code formatting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.0/marked.min.js"></script>
@@ -264,7 +271,7 @@ ADVANCED_CHAT_HTML = '''
     </div>
 
     <script>
-        let chatHistory = []; // For context memory
+        let chatHistory = [];
         let currentPersona = 'arif';
         let isRecording = false;
         const chatBox = document.getElementById('chatBox');
@@ -274,20 +281,33 @@ ADVANCED_CHAT_HTML = '''
         const micBtn = document.getElementById('micBtn');
 
         // Configure marked for highlight.js
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    return hljs.highlight(code, { language: lang }).value;
-                }
-                return hljs.highlightAuto(code).value;
-            },
-            breaks: true,
-            gfm: true
-        });
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return hljs.highlightAuto(code).value;
+                },
+                breaks: true,
+                gfm: true
+            });
+        }
 
         personaSelect.addEventListener('change', () => {
             currentPersona = personaSelect.value;
         });
+
+        function renderMarkdown(text) {
+            try {
+                if (typeof marked !== 'undefined') {
+                    return marked.parse(text);
+                }
+                return text;
+            } catch(e) {
+                return text;
+            }
+        }
 
         function addMessage(text, type, isBad = false) {
             const wrapper = document.createElement('div');
@@ -299,9 +319,8 @@ ADVANCED_CHAT_HTML = '''
             const msgDiv = document.createElement('div');
             msgDiv.className = 'msg';
             
-            // If bot message, render Markdown
             if (type === 'bot') {
-                msgDiv.innerHTML = marked.parse(text);
+                msgDiv.innerHTML = renderMarkdown(text);
             } else {
                 msgDiv.textContent = text;
             }
@@ -315,7 +334,6 @@ ADVANCED_CHAT_HTML = '''
             
             wrapper.appendChild(msgDiv);
             
-            // Copy button for bot messages
             if (type === 'bot') {
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'copy-btn';
@@ -334,8 +352,6 @@ ADVANCED_CHAT_HTML = '''
             
             chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
-            
-            // Store in history for export
             chatHistory.push({ role: type === 'user' ? 'user' : 'assistant', content: text });
         }
 
@@ -345,9 +361,7 @@ ADVANCED_CHAT_HTML = '''
 
             addMessage(text, 'user');
             userInput.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
 
-            // Typing indicator
             const typingWrapper = document.createElement('div');
             typingWrapper.className = 'msg-wrapper bot';
             const typingDiv = document.createElement('div');
@@ -358,7 +372,6 @@ ADVANCED_CHAT_HTML = '''
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                // Send history for context (last 6 messages)
                 const historyPayload = chatHistory.slice(-6).map(m => ({
                     role: m.role,
                     content: m.content
@@ -388,13 +401,12 @@ ADVANCED_CHAT_HTML = '''
                 const isBad = data.is_bad || false;
                 addMessage(reply, 'bot', isBad);
                 
-            } catch (error) {
+                  } catch (error) {
                 chatBox.removeChild(typingWrapper);
                 addMessage('❌ Server offline or API busy. Try again later.', 'bot');
             }
         }
 
-        // Voice Input (Web Speech API)
         function startVoice() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                 alert('Voice input not supported in this browser. Use Chrome/Edge.');
@@ -437,17 +449,16 @@ ADVANCED_CHAT_HTML = '''
             recognition.start();
         }
 
-        // Export chat as .txt
         function exportChat() {
             if (chatHistory.length === 0) {
                 alert('No chat history to export.');
                 return;
             }
-            let text = '--- Arif AI Chat Export ---\n';
-            text += `Date: ${new Date().toLocaleString()}\n\n`;
+            let text = '--- Arif AI Chat Export ---\\n';
+            text += `Date: ${new Date().toLocaleString()}\\n\\n`;
             chatHistory.forEach(msg => {
                 const role = msg.role === 'user' ? '👤 You' : '🤖 Arif';
-                text += `${role}: ${msg.content}\n\n`;
+                text += `${role}: ${msg.content}\\n\\n`;
             });
             const blob = new Blob([text], { type: 'text/plain' });
             const a = document.createElement('a');
@@ -456,7 +467,6 @@ ADVANCED_CHAT_HTML = '''
             a.click();
         }
 
-        // Clear chat
         function clearChat() {
             if (confirm('Clear all messages?')) {
                 chatBox.innerHTML = `
@@ -468,7 +478,6 @@ ADVANCED_CHAT_HTML = '''
             }
         }
 
-        // Toggle light/dark theme
         function toggleTheme() {
             document.body.classList.toggle('light-mode');
         }
@@ -479,3 +488,4 @@ ADVANCED_CHAT_HTML = '''
 </body>
 </html>
 '''
+             
