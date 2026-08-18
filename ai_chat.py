@@ -33,7 +33,7 @@ def contains_bad_words(text):
     return False
 
 # ============================================================
-# ROUTE: CHAT UI
+# ROUTE: CHAT UI (HTML এম্বেডেড)
 # ============================================================
 @bp.route('/')
 def chat_ui():
@@ -132,57 +132,293 @@ RULES:
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
+
 # ============================================================
-# SIMPLE CHAT HTML (No extra options)
+# EMBBEDED HTML (Fully styled, all features)
 # ============================================================
 CHAT_HTML = '''
 <!DOCTYPE html>
-<html>
+<html lang="bn">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arif AI</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arif AI - Attitude</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        body { background: #0B0F19; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .chat-container { width: 450px; height: 750px; background: #141B2D; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #2A3A5C; }
-        .header { background: linear-gradient(135deg, #1A2744, #0F1629); padding: 20px; border-bottom: 1px solid #2A3A5C; text-align: center; }
-        .header h1 { color: #FFD700; font-size: 22px; letter-spacing: 1px; }
-        .header p { color: #8899BB; font-size: 13px; margin-top: 4px; }
-        .header .badge { display: inline-block; background: #FF4D4D; color: white; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #0E1422; }
-        .msg-wrapper { display: flex; flex-direction: column; max-width: 90%; }
-        .msg-wrapper.user { align-self: flex-end; }
-        .msg-wrapper.bot { align-self: flex-start; width: 100%; }
-        .msg { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; word-break: break-word; animation: fadeIn 0.3s ease; position: relative; }
-        .user .msg { background: #2A4B7C; color: white; border-bottom-right-radius: 4px; }
-        .bot .msg { background: #1E2940; color: #E0E6F0; border-bottom-left-radius: 4px; border-left: 3px solid #FFD700; }
-        .bad-msg .msg { background: #4A1A1A !important; color: #FF6B6B !important; border-left: 3px solid #FF0000 !important; font-size: 22px !important; font-weight: bold; }
-        .bad-msg .msg .big-emoji { font-size: 50px; display: block; text-align: center; margin-top: 5px; }
-        .copy-btn { background: none; border: none; color: #8899BB; cursor: pointer; font-size: 11px; margin-top: 4px; align-self: flex-end; padding: 2px 8px; border-radius: 10px; transition: 0.2s; }
-        .copy-btn:hover { background: #2A3A5C; color: #FFD700; }
-        .input-area { display: flex; padding: 15px; background: #0F1629; border-top: 1px solid #2A3A5C; gap: 10px; align-items: center; }
-        .input-area input { flex: 1; background: #1E2940; border: none; padding: 12px 18px; border-radius: 30px; color: white; font-size: 15px; outline: none; border: 1px solid #2A3A5C; }
-        .input-area input:focus { border-color: #FFD700; }
-        .input-area button { background: #FFD700; color: #0B0F19; border: none; width: 50px; height: 50px; border-radius: 50%; font-size: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        .input-area button:hover { background: #FFED4A; transform: scale(1.05); }
-        .input-area .mic-btn { background: #2A3A5C; color: #FFD700; width: 50px; height: 50px; border-radius: 50%; border: none; font-size: 22px; cursor: pointer; transition: 0.2s; }
-        .input-area .mic-btn:hover { background: #3A4A6C; }
-        .input-area .mic-btn.recording { background: #FF4D4D; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .typing { color: #8899BB; font-size: 13px; padding-left: 10px; font-style: italic; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #FFD700; border-radius: 10px; }
-        .footer-note { text-align: center; color: #445566; font-size: 10px; padding: 5px; border-top: 1px solid #1A2744; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #0B0F19;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+        .chat-container {
+            width: 460px;
+            height: 760px;
+            background: #141B2D;
+            border-radius: 40px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,215,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #2A3A5C;
+        }
+        .header {
+            background: linear-gradient(135deg, #1A2744, #0F1629);
+            padding: 22px 20px 16px;
+            border-bottom: 1px solid #2A3A5C;
+            text-align: center;
+            position: relative;
+        }
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 20%;
+            width: 60%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #FFD700, transparent);
+            border-radius: 10px;
+        }
+        .header h1 {
+            color: #FFD700;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px rgba(255,215,0,0.3);
+        }
+        .header p {
+            color: #8899BB;
+            font-size: 13px;
+            margin-top: 4px;
+            letter-spacing: 1px;
+        }
+        .header .badge {
+            display: inline-block;
+            background: #FF4D4D;
+            color: #fff;
+            padding: 3px 14px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .header .dev-name {
+            color: #FFD700;
+            font-weight: 700;
+        }
+        .messages {
+            flex: 1;
+            padding: 20px 18px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: #0E1422;
+        }
+        .msg-wrapper {
+            display: flex;
+            flex-direction: column;
+            max-width: 92%;
+            animation: slideUp 0.3s ease;
+        }
+        .msg-wrapper.user {
+            align-self: flex-end;
+        }
+        .msg-wrapper.bot {
+            align-self: flex-start;
+            width: 100%;
+        }
+        .msg {
+            padding: 12px 18px;
+            border-radius: 22px;
+            font-size: 15px;
+            line-height: 1.6;
+            word-break: break-word;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .user .msg {
+            background: #2A4B7C;
+            color: #FFFFFF;
+            border-bottom-right-radius: 6px;
+        }
+        .bot .msg {
+            background: #1E2940;
+            color: #E0E6F0;
+            border-bottom-left-radius: 6px;
+            border-left: 4px solid #FFD700;
+        }
+        .bad-msg .msg {
+            background: #4A1A1A !important;
+            color: #FF6B6B !important;
+            border-left: 4px solid #FF0000 !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+            text-shadow: 0 0 10px rgba(255,0,0,0.3);
+        }
+        .bad-msg .msg .big-emoji {
+            font-size: 52px;
+            display: block;
+            text-align: center;
+            margin-top: 8px;
+            animation: shake 0.5s ease infinite;
+        }
+        @keyframes shake {
+            0%,100% { transform: rotate(0deg); }
+            25% { transform: rotate(15deg); }
+            75% { transform: rotate(-15deg); }
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #5A6A8A;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 6px;
+            align-self: flex-end;
+            padding: 4px 12px;
+            border-radius: 20px;
+            transition: 0.3s;
+            font-weight: 500;
+        }
+        .copy-btn:hover {
+            background: #2A3A5C;
+            color: #FFD700;
+        }
+        .typing {
+            color: #8899BB;
+            font-size: 13px;
+            padding-left: 6px;
+            font-style: italic;
+        }
+        .input-area {
+            display: flex;
+            padding: 14px 18px;
+            background: #0F1629;
+            border-top: 1px solid #2A3A5C;
+            gap: 12px;
+            align-items: center;
+        }
+        .input-area input {
+            flex: 1;
+            background: #1E2940;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 40px;
+            color: #FFFFFF;
+            font-size: 15px;
+            outline: none;
+            border: 1px solid #2A3A5C;
+            transition: 0.3s;
+        }
+        .input-area input:focus {
+            border-color: #FFD700;
+            box-shadow: 0 0 15px rgba(255,215,0,0.1);
+        }
+        .input-area input::placeholder {
+            color: #5A6A8A;
+            font-weight: 300;
+        }
+        .input-area button {
+            background: #FFD700;
+            color: #0B0F19;
+            border: none;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            font-size: 24px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(255,215,0,0.15);
+        }
+        .input-area button:hover {
+            background: #FFED4A;
+            transform: scale(1.06);
+            box-shadow: 0 0 30px rgba(255,215,0,0.3);
+        }
+        .input-area .mic-btn {
+            background: #2A3A5C;
+            color: #FFD700;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .input-area .mic-btn:hover {
+            background: #3A4A6C;
+        }
+        .input-area .mic-btn.recording {
+            background: #FF4D4D;
+            color: #FFFFFF;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .footer-note {
+            text-align: center;
+            color: #3A4A6A;
+            font-size: 10px;
+            padding: 8px;
+            border-top: 1px solid #1A2744;
+            letter-spacing: 0.5px;
+        }
+        .footer-note span {
+            color: #FFD700;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FFD700;
+            border-radius: 20px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FFED4A;
+        }
+        @media (max-width: 500px) {
+            .chat-container {
+                width: 100%;
+                height: 95vh;
+                border-radius: 24px;
+            }
+            .header h1 {
+                font-size: 22px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="chat-container">
         <div class="header">
             <h1>🤖 ARIF</h1>
-            <p><span class="badge">⚡ ATTITUDE</span> Developer: <strong style="color:#FFD700;">Arif</strong></p>
+            <p><span class="badge">⚡ Attitude</span> Developer: <span class="dev-name">Arif</span></p>
         </div>
         <div class="messages" id="chatBox">
             <div class="msg-wrapper bot">
@@ -190,11 +426,13 @@ CHAT_HTML = '''
             </div>
         </div>
         <div class="input-area">
-            <button class="mic-btn" id="micBtn" onclick="startVoice()">🎤</button>
+            <button class="mic-btn" id="micBtn" onclick="startVoice()" title="Voice Input">🎤</button>
             <input type="text" id="userInput" placeholder="Ask anything... (any language)" />
-            <button id="sendBtn">➤</button>
+            <button id="sendBtn" title="Send">➤</button>
         </div>
-        <div class="footer-note">🔥 Bad words = bigger attitude + 🖕 &nbsp;|&nbsp; 🎤 Voice input</div>
+        <div class="footer-note">
+            🔥 Bad words = bigger attitude + <span>🖕</span> &nbsp;·&nbsp; 🎤 Voice ready
+        </div>
     </div>
 
     <script>
@@ -210,21 +448,16 @@ CHAT_HTML = '''
             if (isBad && type === 'bot') {
                 wrapper.classList.add('bad-msg');
             }
-            
             const msgDiv = document.createElement('div');
             msgDiv.className = 'msg';
             msgDiv.textContent = text;
-            
             if (isBad && type === 'bot') {
                 const emojiSpan = document.createElement('span');
                 emojiSpan.className = 'big-emoji';
                 emojiSpan.textContent = '🖕';
                 msgDiv.appendChild(emojiSpan);
             }
-            
             wrapper.appendChild(msgDiv);
-            
-            // Copy button for bot messages
             if (type === 'bot') {
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'copy-btn';
@@ -239,7 +472,6 @@ CHAT_HTML = '''
                 };
                 wrapper.appendChild(copyBtn);
             }
-            
             chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
             chatHistory.push({ role: type === 'user' ? 'user' : 'assistant', content: text });
@@ -248,10 +480,8 @@ CHAT_HTML = '''
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
-
             addMessage(text, 'user');
             userInput.value = '';
-
             const typingWrapper = document.createElement('div');
             typingWrapper.className = 'msg-wrapper bot';
             const typingDiv = document.createElement('div');
@@ -260,13 +490,11 @@ CHAT_HTML = '''
             typingWrapper.appendChild(typingDiv);
             chatBox.appendChild(typingWrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
-
             try {
                 const historyPayload = chatHistory.slice(-6).map(m => ({
                     role: m.role,
                     content: m.content
                 }));
-
                 const response = await fetch('/ai/chat_api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -275,21 +503,16 @@ CHAT_HTML = '''
                         history: historyPayload
                     })
                 });
-
                 if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
-                
                 chatBox.removeChild(typingWrapper);
-                
                 if (data.error) {
                     addMessage('❌ ' + data.error, 'bot');
                     return;
                 }
-                
                 const reply = data.reply || 'No response from AI.';
                 const isBad = data.is_bad || false;
                 addMessage(reply, 'bot', isBad);
-                
             } catch (error) {
                 chatBox.removeChild(typingWrapper);
                 addMessage('❌ Server offline or API busy. Try again later.', 'bot');
@@ -301,16 +524,13 @@ CHAT_HTML = '''
                 alert('Voice input not supported in this browser. Use Chrome/Edge.');
                 return;
             }
-            
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
             recognition.lang = 'auto';
             recognition.continuous = false;
             recognition.interimResults = true;
-
             micBtn.classList.add('recording');
             micBtn.textContent = '⏹️';
-
             recognition.onresult = function(event) {
                 let transcript = '';
                 for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -323,23 +543,22 @@ CHAT_HTML = '''
                     sendMessage();
                 }
             };
-
             recognition.onerror = function() {
                 micBtn.classList.remove('recording');
                 micBtn.textContent = '🎤';
                 alert('Voice recognition error. Try again.');
             };
-
             recognition.onend = function() {
                 micBtn.classList.remove('recording');
                 micBtn.textContent = '🎤';
             };
-
             recognition.start();
         }
 
         sendBtn.addEventListener('click', sendMessage);
-        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
     </script>
 </body>
 </html>
