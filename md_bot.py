@@ -1,57 +1,26 @@
-from flask import Blueprint, request, redirect, url_for, render_template_string
-import sqlite3
+from flask import Blueprint, request, redirect, render_template_string
 import time
 import threading
 import requests
 import json
 import logging
+from pymongo import MongoClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
-DB_PATH = '/tmp/phish_data.db'
 
-# ========== ডেটাবেস ==========
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS bot_config (key TEXT PRIMARY KEY, value TEXT)')
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('bot_token', '')")
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_react', 'off')")
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_welcome', 'off')")
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('auto_reply', 'off')")
-    c.execute("INSERT OR IGNORE INTO bot_config (key, value) VALUES ('moderation_enabled', 'off')")  # নতুন
-    conn.commit()
-    conn.close()
-init_db()
+# ========== 🔑 আপনার বটের টোকেন ==========
+BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
+BOT_LINK = "https://t.me/Arif1222_bot"
+DASHBOARD_BASE = "https://vip-tools-backend.onrender.com"
 
-def get_config(key):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT value FROM bot_config WHERE key=?", (key,))
-        row = c.fetchone()
-        conn.close()
-        return row[0] if row else ''
-    except:
-        return ''
-
-def set_config(key, value):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE bot_config SET value=? WHERE key=?", (value, key))
-    conn.commit()
-    conn.close()
-
-def get_token():
-    return get_config('bot_token')
-
-def set_token(token):
-    set_config('bot_token', token)
-
-# ========== থ্রেড ট্র্যাকিং ==========
-polling_started = False
+# ========== MongoDB ==========
+MONGO_URI = "mongodb+srv://Cyber_md_bot:cybermd123@cluster0.tre505e.mongodb.net/?appName=Cluster0"
+client = MongoClient(MONGO_URI)
+db = client['cyber_tools']
+group_col = db['group_settings']
 
 # ========== অটো রিপ্লাই ==========
 AUTO_REPLIES = {
@@ -62,82 +31,150 @@ AUTO_REPLIES = {
     'how are you': '<i>I\'m just a bot, but I\'m doing fine!</i> 😄',
 }
 
-# ========== রাউট ==========
-@bp.route('/', methods=['GET', 'POST'])
-def setup_or_dashboard():
-    token = get_token()
-    if not token:
-        if request.method == 'POST':
-            new_token = request.form.get('bot_token', '').strip()
-            if new_token:
-                try:
-                    r = requests.get(f"https://api.telegram.org/bot{new_token}/getMe", timeout=5)
-                    if r.json().get('ok'):
-                        set_token(new_token)
-                        start_polling_thread()
-                        return redirect(url_for('md_bot.setup_or_dashboard'))
-                    else:
-                        error = "❌ Invalid token."
-                except Exception as e:
-                    error = f"❌ Error: {e}"
-            else:
-                error = "❌ Token cannot be empty."
-            return render_template_string(SETUP_HTML, error=error)
-        return render_template_string(SETUP_HTML, error=None)
-    else:
-        if request.method == 'POST':
-            set_config('auto_react', request.form.get('auto_react', 'off'))
-            set_config('auto_welcome', request.form.get('auto_welcome', 'off'))
-            set_config('auto_reply', request.form.get('auto_reply', 'off'))
-            set_config('moderation_enabled', request.form.get('moderation_enabled', 'off'))
-            return redirect(url_for('md_bot.setup_or_dashboard'))
-        status = {
-            'auto_react': get_config('auto_react') == 'on',
-            'auto_welcome': get_config('auto_welcome') == 'on',
-            'auto_reply': get_config('auto_reply') == 'on',
-            'moderation_enabled': get_config('moderation_enabled') == 'on',
-        }
-        return render_template_string(DASHBOARD_HTML, status=status)
+# ========== গ্রুপ সেটিংস ফাংশন ==========
+def get_group(chat_id):
+    return group_col.find_one({'chat_id': chat_id})
 
-SETUP_HTML = '''
+def get_group_setting(chat_id, key, default='off'):
+    doc = group_col.find_one({'chat_id': chat_id})
+    return doc.get(key, default) if doc else default
+
+def set_group_setting(chat_id, key, value):
+    group_col.update_one(
+        {'chat_id': chat_id},
+        {'$set': {key: value}},
+        upsert=True
+    )
+
+def register_group(chat_id, title):
+    group_col.update_one(
+        {'chat_id': chat_id},
+        {
+            '$set': {'title': title},
+            '$setOnInsert': {
+                'auto_react': 'off',
+                'auto_welcome': 'off',
+                'auto_reply': 'off',
+                'moderation_enabled': 'off'
+            }
+        },
+        upsert=True
+    )
+
+def get_all_groups():
+    return list(group_col.find({}, {'chat_id': 1, 'title': 1}))
+
+def remove_group(chat_id):
+    group_col.delete_one({'chat_id': chat_id})
+
+# ========== বটের আইডি ==========
+BOT_ID = None
+
+def fetch_bot_id():
+    global BOT_ID
+    try:
+        r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=5)
+        if r.json().get('ok'):
+            BOT_ID = r.json()['result']['id']
+            logger.info(f"✅ Bot ID: {BOT_ID}")
+    except Exception as e:
+        logger.error(f"Bot ID fetch error: {e}")
+
+# ========== ড্যাশবোর্ড (গ্রুপ লিস্ট) ==========
+@bp.route('/', methods=['GET', 'POST'])
+def dashboard():
+    chat_id = request.args.get('chat_id', type=int)
+
+    # ===== POST: সেটিংস সেভ =====
+    if request.method == 'POST' and chat_id:
+        set_group_setting(chat_id, 'auto_react', request.form.get('auto_react', 'off'))
+        set_group_setting(chat_id, 'auto_welcome', request.form.get('auto_welcome', 'off'))
+        set_group_setting(chat_id, 'auto_reply', request.form.get('auto_reply', 'off'))
+        set_group_setting(chat_id, 'moderation_enabled', request.form.get('moderation_enabled', 'off'))
+        return redirect(f'/bot/?chat_id={chat_id}')
+
+    # ===== গ্রুপ লিস্ট =====
+    if not chat_id:
+        groups = get_all_groups()
+        return render_template_string(GROUP_LIST_HTML, groups=groups, bot_link=BOT_LINK)
+
+    # ===== নির্দিষ্ট গ্রুপের সেটিংস =====
+    group = get_group(chat_id)
+    if not group:
+        return "<h2 style='color:red;'>❌ Group not found. <a href='/bot/'>Go Back</a></h2>"
+
+    status = {
+        'auto_react': group.get('auto_react', 'off') == 'on',
+        'auto_welcome': group.get('auto_welcome', 'off') == 'on',
+        'auto_reply': group.get('auto_reply', 'off') == 'on',
+        'moderation_enabled': group.get('moderation_enabled', 'off') == 'on',
+    }
+    return render_template_string(
+        DASHBOARD_HTML,
+        status=status,
+        chat_id=chat_id,
+        title=group.get('title', 'Unknown Group')
+    )
+
+# ========== HTML: গ্রুপ লিস্ট ==========
+GROUP_LIST_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cyber Tools MD – Setup</title>
+<title>Cyber Tools MD – Groups</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; }
-body { background:#0d1117; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px; }
-.card { background:#161b22; border-radius:28px; padding:30px 24px; max-width:400px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid #30363d; }
-h1 { color:#f0f6fc; font-size:24px; margin-bottom:8px; }
-p { color:#8b949e; font-size:14px; margin-bottom:20px; }
-input { width:100%; padding:12px; border-radius:10px; border:1px solid #30363d; background:#0d1117; color:#fff; font-size:16px; }
-button { width:100%; padding:12px; border-radius:10px; border:0; background:#238636; color:#fff; font-size:16px; font-weight:600; cursor:pointer; margin-top:12px; }
-button:hover { background:#2ea043; }
-.error { color:#f85149; font-size:14px; margin-bottom:10px; }
+* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { background:#0d1117; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; padding:20px; }
+.card { background:#161b22; border-radius:28px; padding:30px 24px; max-width:500px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid #30363d; margin-top:30px; }
+h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
+.sub { color:#8b949e; font-size:14px; margin-bottom:20px; }
+.badge { display:inline-block; background:#238636; color:#fff; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:500; margin-bottom:20px; }
+.btn-open { display:block; background:#1f6feb; color:#fff; text-align:center; padding:14px; border-radius:14px; font-size:17px; font-weight:600; text-decoration:none; margin-bottom:24px; }
+.btn-open:hover { background:#388bfd; }
+.divider { border:none; border-top:1px solid #30363d; margin:20px 0; }
+.group-item { display:flex; justify-content:space-between; align-items:center; background:#0d1117; padding:14px 18px; border-radius:14px; margin-bottom:10px; text-decoration:none; color:#c9d1d9; border:1px solid #21262d; transition:all 0.2s; }
+.group-item:hover { background:#1c2333; border-color:#58a6ff; }
+.group-title { font-weight:500; font-size:15px; color:#f0f6fc; }
+.group-arrow { color:#58a6ff; font-size:18px; }
+.empty { text-align:center; color:#8b949e; padding:30px 10px; font-size:14px; line-height:1.7; }
+.footer { text-align:center; color:#484f58; font-size:12px; margin-top:20px; }
 </style>
 </head>
 <body>
 <div class="card">
     <h1>🛡️ Cyber Tools MD</h1>
-    <p>Enter your Telegram Bot Token to activate.</p>
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <form method="post">
-        <input type="text" name="bot_token" placeholder="e.g. 123456:ABC-DEF" required>
-        <button type="submit">Activate Bot</button>
-    </form>
+    <div class="sub">Select a group to configure</div>
+    <div class="badge">● Active</div>
+    <a href="{{ bot_link }}" target="_blank" class="btn-open">📱 Open Bot</a>
+    <hr class="divider">
+    {% if groups %}
+        {% for g in groups %}
+        <a href="/bot/?chat_id={{ g.chat_id }}" class="group-item">
+            <span class="group-title">🏠 {{ g.title or 'Unnamed Group' }}</span>
+            <span class="group-arrow">→</span>
+        </a>
+        {% endfor %}
+    {% else %}
+        <div class="empty">
+            📭 No groups yet.<br>
+            Add <b>@Arif1222_bot</b> to a Telegram group<br>to get started.
+        </div>
+    {% endif %}
+    <div class="footer">🛡️ Cyber Tools MD</div>
 </div>
 </body>
 </html>
 '''
 
+# ========== HTML: নির্দিষ্ট গ্রুপের ড্যাশবোর্ড ==========
 DASHBOARD_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cyber Tools MD – Dashboard</title>
+<title>{{ title }} – Dashboard</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; }
+* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 body { background:#0d1117; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px; }
 .card { background:#161b22; border-radius:28px; padding:30px 24px; max-width:450px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid #30363d; }
-h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
+h1 { color:#f0f6fc; font-size:22px; margin-bottom:4px; word-break:break-word; }
 .sub { color:#8b949e; font-size:14px; margin-bottom:20px; }
 .badge { display:inline-block; background:#238636; color:#fff; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:500; margin-bottom:20px; }
 .btn-open { display:block; background:#1f6feb; color:#fff; text-align:center; padding:14px; border-radius:14px; font-size:17px; font-weight:600; text-decoration:none; margin-bottom:24px; }
@@ -150,14 +187,17 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 .save-btn { width:100%; background:#238636; color:#fff; border:none; padding:14px; border-radius:14px; font-size:17px; font-weight:600; cursor:pointer; margin-top:12px; }
 .save-btn:hover { background:#2ea043; }
 .footer { text-align:center; color:#484f58; font-size:12px; margin-top:20px; }
+.back-link { display:inline-block; margin-bottom:16px; color:#58a6ff; text-decoration:none; font-size:14px; }
+.back-link:hover { text-decoration:underline; }
 .mod-link { display:inline-block; margin-top:10px; color:#58a6ff; text-decoration:none; font-size:14px; }
 .mod-link:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
 <div class="card">
-    <h1>🛡️ Cyber Tools MD</h1>
-    <div class="sub">Bot Control Panel</div>
+    <a href="/bot/" class="back-link">← All Groups</a>
+    <h1>🛡️ {{ title }}</h1>
+    <div class="sub">Group Control Panel</div>
     <div class="badge">● Active</div>
     <a href="https://t.me/Arif1222_bot" target="_blank" class="btn-open">📱 Open Bot</a>
     <hr class="divider">
@@ -192,101 +232,67 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
         </div>
         <button type="submit" class="save-btn">Save Settings</button>
     </form>
-    <a href="/bot/mod/dashboard" class="mod-link">⚙️ Advanced Moderation Settings →</a>
-    <div class="footer">Token is hidden for security</div>
+    <a href="/bot/mod/dashboard?chat_id={{ chat_id }}" class="mod-link">⚙️ Advanced Moderation Settings →</a>
+    <div class="footer">🛡️ Cyber Tools MD</div>
 </div>
 </body>
 </html>
 '''
 
 # ========== বট ফাংশন ==========
-def send_message(chat_id, text, token, parse_mode='HTML'):
-    if not token:
-        return
+def send_message(chat_id, text, parse_mode='HTML'):
     try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         r = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=5)
-        if r.json().get('ok'):
-            logger.info(f"✅ Sent message to {chat_id}")
-        else:
-            logger.error(f"❌ Send failed: {r.text}")
+        return r.json().get('ok', False)
     except Exception as e:
         logger.error(f"Send error: {e}")
+        return False
 
-def send_reactions(chat_id, message_id, token):
-    if get_config('auto_react') != 'on':
+def send_reactions(chat_id, message_id):
+    if get_group_setting(chat_id, 'auto_react') != 'on':
         return
-    if not token:
-        logger.error("❌ No token found.")
-        return
-
     emojis = ["👍", "❤️", "🔥"]
-    logger.info(f"📡 Sending {len(emojis)} reactions: {emojis}")
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
-        url = f"https://api.telegram.org/bot{token}/setMessageReaction"
-        payload = {
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'reaction': json.dumps(reaction_list)
-        }
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
+        payload = {'chat_id': chat_id, 'message_id': message_id, 'reaction': json.dumps(reaction_list)}
         r = requests.post(url, json=payload, timeout=10)
-        data = r.json()
-        if data.get('ok'):
-            logger.info(f"✅ {len(emojis)} reactions sent to {message_id}")
-        else:
-            logger.error(f"❌ React failed: {data}")
-            if data.get('error_code') == 400 and 'REACTIONS_TOO_MANY' in data.get('description', ''):
-                logger.warning("⚠️ Too many reactions, trying one by one...")
-                for emoji in emojis:
-                    try:
-                        single_payload = {
-                            'chat_id': chat_id,
-                            'message_id': message_id,
-                            'reaction': json.dumps([{"type": "emoji", "emoji": emoji}])
-                        }
-                        r2 = requests.post(url, json=single_payload, timeout=5)
-                        if r2.json().get('ok'):
-                            logger.info(f"✅ Single reaction {emoji} sent")
-                        else:
-                            logger.error(f"❌ Single {emoji} failed: {r2.json()}")
-                        time.sleep(0.5)
-                    except Exception as e2:
-                        logger.error(f"Single reaction error: {e2}")
+        if r.json().get('ok'):
+            logger.info(f"✅ Reactions sent to {message_id} in {chat_id}")
     except Exception as e:
-        logger.error(f"❌ React exception: {e}")
+        logger.error(f"React error: {e}")
 
-# ========== কমান্ড ও অটো রিপ্লাই ==========
 processed_messages = set()
 
-def handle_auto_reply(msg, token):
-    if get_config('auto_reply') != 'on':
+def handle_auto_reply(msg):
+    chat_id = msg['chat']['id']
+    if get_group_setting(chat_id, 'auto_reply') != 'on':
         return
     text = msg.get('text', '').lower().strip()
     if not text:
         return
-    chat_id = msg['chat']['id']
     message_id = msg['message_id']
     if message_id in processed_messages:
         return
     processed_messages.add(message_id)
     for keyword, reply in AUTO_REPLIES.items():
         if keyword in text:
-            send_message(chat_id, reply, token)
+            send_message(chat_id, reply)
             break
 
-def handle_welcome(msg, token):
-    if get_config('auto_welcome') != 'on':
+def handle_welcome(msg):
+    chat_id = msg['chat']['id']
+    if get_group_setting(chat_id, 'auto_welcome') != 'on':
         return
     if 'new_chat_members' not in msg:
         return
-    chat_id = msg['chat']['id']
     for member in msg['new_chat_members']:
         name = member.get('first_name', 'Guest')
         welcome = f"<b>🎉 Welcome {name}!</b> 🥳\nGlad to have you here. Type /start to see what I can do."
-        send_message(chat_id, welcome, token)
+        send_message(chat_id, welcome)
 
-def handle_commands(msg, token):
+def handle_commands(msg):
     text = msg.get('text', '')
     if not text.startswith('/'):
         return
@@ -303,10 +309,10 @@ def handle_commands(msg, token):
 /echo [text] - All formats
 
 <b>⚙️ Dashboard:</b>
-/bot/ - Control all features
+Open /bot/ on the website to control this group.
 
 <b>💬 Auto Reply:</b>
-I reply to hi, good morning, good night, etc. (if enabled)."""
+I reply to hi, good morning, good night, etc. (if enabled in your group)."""
     elif text == '/help':
         reply = "Send /start to see commands."
     elif text.startswith('/bold '):
@@ -320,7 +326,7 @@ I reply to hi, good morning, good night, etc. (if enabled)."""
     elif text.startswith('/echo '):
         reply = f"<b>{text[6:]}</b>, <code>code</code>, <s>strike</s>"
     if reply:
-        send_message(chat_id, reply, token)
+        send_message(chat_id, reply)
 
 # ========== মডারেশন ইমপোর্ট ==========
 from md_tools import moderation
@@ -328,47 +334,72 @@ from md_tools import moderation
 # ========== পোলিং ==========
 def polling_worker():
     logger.info("🔄 Polling thread started.")
+    fetch_bot_id()
     last_update_id = 0
     while True:
-        token = get_token()
-        if not token:
-            time.sleep(5)
-            continue
         try:
-            requests.get(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=5)
+            requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", timeout=5)
         except:
             pass
         try:
             resp = requests.get(
-                f"https://api.telegram.org/bot{token}/getUpdates",
+                f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
                 params={'offset': last_update_id + 1, 'timeout': 30}
             )
             data = resp.json()
             if not data.get('ok'):
                 if data.get('error_code') == 409:
-                    logger.warning("⚠️ 409 Conflict – another instance is running. Will retry...")
+                    logger.warning("⚠️ 409 Conflict – retry...")
                 else:
                     logger.error(f"API error: {data}")
                 time.sleep(5)
                 continue
+
             for update in data.get('result', []):
                 last_update_id = update['update_id']
                 msg = update.get('message')
                 if not msg:
                     continue
-                logger.info(f"📩 Received: {msg.get('text', '')}")
-                
-                # মূল ৩টি টুল
-                send_reactions(msg['chat']['id'], msg['message_id'], token)
-                handle_commands(msg, token)
-                handle_auto_reply(msg, token)
-                handle_welcome(msg, token)
-                
-                # মডারেশন (শুধুমাত্র যদি চালু থাকে)
-                if get_config('moderation_enabled') == 'on':
-                    moderation.handle_moderation(msg, token)
-                    moderation.handle_admin_commands(msg, token)
-                    
+
+                chat_id = msg['chat']['id']
+                chat_type = msg['chat'].get('type')
+                chat_title = msg['chat'].get('title', 'Private Chat')
+
+                # ===== গ্রুপ অটো রেজিস্টার =====
+                if chat_type in ('group', 'supergroup'):
+                    register_group(chat_id, chat_title)
+
+                # ===== বটকে গ্রুপে অ্যাড করা হলে =====
+                if 'new_chat_members' in msg:
+                    for member in msg['new_chat_members']:
+                        if BOT_ID and member.get('id') == BOT_ID:
+                            register_group(chat_id, chat_title)
+                            send_message(
+                                chat_id,
+                                f"🛡️ <b>Thanks for adding me!</b>\n\n"
+                                f"Configure this group here:\n"
+                                f"<a href='{DASHBOARD_BASE}/bot/?chat_id={chat_id}'>"
+                                f"👉 Open Dashboard</a>"
+                            )
+                            logger.info(f"✅ Bot added to group: {chat_title} ({chat_id})")
+
+                # ===== বটকে গ্রুপ থেকে রিমুভ করা হলে =====
+                if 'left_chat_member' in msg:
+                    if BOT_ID and msg['left_chat_member'].get('id') == BOT_ID:
+                        remove_group(chat_id)
+                        logger.info(f"❌ Bot removed from group: {chat_id}")
+
+                # ===== মেসেজ প্রসেস =====
+                send_reactions(chat_id, msg['message_id'])
+                handle_commands(msg)
+                handle_auto_reply(msg)
+                handle_welcome(msg)
+
+                # ===== মডারেশন (গ্রুপে চালু থাকলে) =====
+                if get_group_setting(chat_id, 'moderation_enabled') == 'on':
+                    moderation.handle_moderation(msg, BOT_TOKEN)
+                    moderation.handle_admin_commands(msg, BOT_TOKEN)
+
             time.sleep(1)
         except Exception as e:
             logger.error(f"Polling error: {e}")
@@ -380,17 +411,14 @@ def start_polling_thread():
         return
     threading.Thread(target=polling_worker, daemon=True).start()
     polling_started = True
-    logger.info("🚀 Polling thread started (first time).")
+    logger.info("🚀 Polling thread started.")
 
-if get_token():
-    start_polling_thread()
-else:
-    logger.info("⏳ No token found. Bot will start after token is set.")
+polling_started = False
+start_polling_thread()
+logger.info("✅ Bot module loaded with per-group settings.")
 
-# ========== মডারেশন ব্লুপ্রিন্ট রেজিস্টার ==========
 bp.register_blueprint(moderation.bp)
 
-# ========== md_tools (অন্যান্য) ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
