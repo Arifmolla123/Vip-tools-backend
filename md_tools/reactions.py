@@ -5,7 +5,7 @@ from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
+BOT_TOKEN = "8193376363:AAFyMyVmK7gryI4H1ZxZOobwFt_wzeFwJrM"
 
 # ========== MongoDB ==========
 MONGO_URI = "mongodb+srv://Cyber_md_bot:cybermd123@cluster0.tre505e.mongodb.net/?appName=Cluster0"
