@@ -10,7 +10,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-2026')
 init_db()
 
 # ========== SocketIO ==========
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 app.socketio = socketio
 
 # ========== বাকি ব্লুপ্রিন্ট ==========
