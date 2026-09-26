@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 
 # ========== Bot Configuration ==========
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
+BOT_TOKEN = "8193376363:AAFyFu4HySboXZcS45qJ1Lct2foJaTqyitM"
 BOT_USERNAME = "@Arif1222_bot"
 
 # ========== MongoDB ==========
