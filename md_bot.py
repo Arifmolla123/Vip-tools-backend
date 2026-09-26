@@ -31,7 +31,7 @@ AUTO_REPLIES = {
     'how are you': '<i>I\'m just a bot, but I\'m doing fine!</i> 😄',
 }
 
-# ========== গ্রুপ সেটিংস ফাংশন ==========
+# ========== গ্রুপ সেটিংস ==========
 def get_group(chat_id):
     return group_col.find_one({'chat_id': chat_id})
 
@@ -40,11 +40,7 @@ def get_group_setting(chat_id, key, default='off'):
     return doc.get(key, default) if doc else default
 
 def set_group_setting(chat_id, key, value):
-    group_col.update_one(
-        {'chat_id': chat_id},
-        {'$set': {key: value}},
-        upsert=True
-    )
+    group_col.update_one({'chat_id': chat_id}, {'$set': {key: value}}, upsert=True)
 
 def register_group(chat_id, title):
     group_col.update_one(
@@ -80,12 +76,11 @@ def fetch_bot_id():
     except Exception as e:
         logger.error(f"Bot ID fetch error: {e}")
 
-# ========== ড্যাশবোর্ড (গ্রুপ লিস্ট) ==========
+# ========== ড্যাশবোর্ড ==========
 @bp.route('/', methods=['GET', 'POST'])
 def dashboard():
     chat_id = request.args.get('chat_id', type=int)
 
-    # ===== POST: সেটিংস সেভ =====
     if request.method == 'POST' and chat_id:
         set_group_setting(chat_id, 'auto_react', request.form.get('auto_react', 'off'))
         set_group_setting(chat_id, 'auto_welcome', request.form.get('auto_welcome', 'off'))
@@ -93,12 +88,10 @@ def dashboard():
         set_group_setting(chat_id, 'moderation_enabled', request.form.get('moderation_enabled', 'off'))
         return redirect(f'/bot/?chat_id={chat_id}')
 
-    # ===== গ্রুপ লিস্ট =====
     if not chat_id:
         groups = get_all_groups()
         return render_template_string(GROUP_LIST_HTML, groups=groups, bot_link=BOT_LINK)
 
-    # ===== নির্দিষ্ট গ্রুপের সেটিংস =====
     group = get_group(chat_id)
     if not group:
         return "<h2 style='color:red;'>❌ Group not found. <a href='/bot/'>Go Back</a></h2>"
@@ -116,13 +109,12 @@ def dashboard():
         title=group.get('title', 'Unknown Group')
     )
 
-# ========== HTML: গ্রুপ লিস্ট ==========
 GROUP_LIST_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cyber Tools MD – Groups</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; }
 body { background:#0d1117; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; padding:20px; }
 .card { background:#161b22; border-radius:28px; padding:30px 24px; max-width:500px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid #30363d; margin-top:30px; }
 h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
@@ -165,13 +157,12 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 </html>
 '''
 
-# ========== HTML: নির্দিষ্ট গ্রুপের ড্যাশবোর্ড ==========
 DASHBOARD_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ title }} – Dashboard</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+* { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; }
 body { background:#0d1117; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px; }
 .card { background:#161b22; border-radius:28px; padding:30px 24px; max-width:450px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid #30363d; }
 h1 { color:#f0f6fc; font-size:22px; margin-bottom:4px; word-break:break-word; }
@@ -250,18 +241,27 @@ def send_message(chat_id, text, parse_mode='HTML'):
         return False
 
 def send_reactions(chat_id, message_id):
-    if get_group_setting(chat_id, 'auto_react') != 'on':
+    """প্রতিটি গ্রুপের নিজস্ব auto_react সেটিং অনুযায়ী ৩টি রিয়েক্ট পাঠায়"""
+    setting = get_group_setting(chat_id, 'auto_react')
+    logger.info(f"🔍 React check: chat_id={chat_id}, auto_react='{setting}', msg_id={message_id}")
+    
+    if setting != 'on':
+        logger.info(f"⏸️ Skipped (setting is '{setting}')")
         return
+    
     emojis = ["👍", "❤️", "🔥"]
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
         payload = {'chat_id': chat_id, 'message_id': message_id, 'reaction': json.dumps(reaction_list)}
         r = requests.post(url, json=payload, timeout=10)
-        if r.json().get('ok'):
+        data = r.json()
+        if data.get('ok'):
             logger.info(f"✅ Reactions sent to {message_id} in {chat_id}")
+        else:
+            logger.error(f"❌ React failed: {data}")
     except Exception as e:
-        logger.error(f"React error: {e}")
+        logger.error(f"❌ React exception: {e}")
 
 processed_messages = set()
 
@@ -329,7 +329,12 @@ I reply to hi, good morning, good night, etc. (if enabled in your group)."""
         send_message(chat_id, reply)
 
 # ========== মডারেশন ইমপোর্ট ==========
-from md_tools import moderation
+try:
+    from md_tools import moderation
+    MODERATION_AVAILABLE = True
+except ImportError:
+    MODERATION_AVAILABLE = False
+    logger.warning("⚠️ moderation module not found")
 
 # ========== পোলিং ==========
 def polling_worker():
@@ -365,11 +370,9 @@ def polling_worker():
                 chat_type = msg['chat'].get('type')
                 chat_title = msg['chat'].get('title', 'Private Chat')
 
-                # ===== গ্রুপ অটো রেজিস্টার =====
                 if chat_type in ('group', 'supergroup'):
                     register_group(chat_id, chat_title)
 
-                # ===== বটকে গ্রুপে অ্যাড করা হলে =====
                 if 'new_chat_members' in msg:
                     for member in msg['new_chat_members']:
                         if BOT_ID and member.get('id') == BOT_ID:
@@ -383,20 +386,18 @@ def polling_worker():
                             )
                             logger.info(f"✅ Bot added to group: {chat_title} ({chat_id})")
 
-                # ===== বটকে গ্রুপ থেকে রিমুভ করা হলে =====
                 if 'left_chat_member' in msg:
                     if BOT_ID and msg['left_chat_member'].get('id') == BOT_ID:
                         remove_group(chat_id)
                         logger.info(f"❌ Bot removed from group: {chat_id}")
 
-                # ===== মেসেজ প্রসেস =====
+                logger.info(f"📩 Received: {msg.get('text', '[non-text]')}")
                 send_reactions(chat_id, msg['message_id'])
                 handle_commands(msg)
                 handle_auto_reply(msg)
                 handle_welcome(msg)
 
-                # ===== মডারেশন (গ্রুপে চালু থাকলে) =====
-                if get_group_setting(chat_id, 'moderation_enabled') == 'on':
+                if MODERATION_AVAILABLE and get_group_setting(chat_id, 'moderation_enabled') == 'on':
                     moderation.handle_moderation(msg, BOT_TOKEN)
                     moderation.handle_admin_commands(msg, BOT_TOKEN)
 
@@ -404,6 +405,8 @@ def polling_worker():
         except Exception as e:
             logger.error(f"Polling error: {e}")
             time.sleep(5)
+
+polling_started = False
 
 def start_polling_thread():
     global polling_started
@@ -413,17 +416,19 @@ def start_polling_thread():
     polling_started = True
     logger.info("🚀 Polling thread started.")
 
-polling_started = False
 start_polling_thread()
-logger.info("✅ Bot module loaded with per-group settings.")
+logger.info("✅ md_bot module loaded with per-group settings.")
 
-bp.register_blueprint(moderation.bp)
+# ========== মডারেশন ব্লুপ্রিন্ট ==========
+if MODERATION_AVAILABLE:
+    bp.register_blueprint(moderation.bp)
 
+# ========== md_tools ==========
 try:
     from md_tools import preview, converter, formatter
     bp.register_blueprint(preview.bp)
     bp.register_blueprint(converter.bp)
     bp.register_blueprint(formatter.bp)
     logger.info("✅ md_tools loaded.")
-except:
+except ImportError:
     pass
