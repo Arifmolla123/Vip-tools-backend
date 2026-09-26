@@ -1,29 +1,35 @@
 import requests
 import json
 import logging
-import sqlite3
+from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1cpus1Z2iz6kOORo"
-DB_PATH = '/tmp/phish_data.db'
 
-def get_auto_react():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT value FROM bot_config WHERE key='auto_react'")
-    row = c.fetchone()
-    conn.close()
-    return row[0] if row else 'off'
+BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
+
+# ========== MongoDB ==========
+MONGO_URI = "mongodb+srv://Cyber_md_bot:cybermd123@cluster0.tre505e.mongodb.net/?appName=Cluster0"
+client = MongoClient(MONGO_URI)
+db = client['cyber_tools']
+group_col = db['group_settings']
+
+def get_group_setting(chat_id, key, default='off'):
+    """গ্রুপের নির্দিষ্ট সেটিং পড়ে"""
+    doc = group_col.find_one({'chat_id': chat_id})
+    return doc.get(key, default) if doc else default
 
 def handle_reaction(msg):
-    if get_auto_react() != 'on':
-        return
+    """প্রতিটি গ্রুপের নিজস্ব auto_react সেটিং অনুযায়ী রিয়েক্ট পাঠায়"""
     chat_id = msg['chat']['id']
     message_id = msg['message_id']
-    
-    # ১১টি ইমোজি (টেলিগ্রাম সর্বোচ্চ ১১টি অনুমতি দেয়)
-    emojis = ["❤️", "🔥", "👍", "🎉", "😂", "😍", "👏", "💯", "🤩", "🥳", "✨"]
-    
+
+    # গ্রুপের auto_react সেটিং চেক
+    if get_group_setting(chat_id, 'auto_react') != 'on':
+        return
+
+    # ৩টি নিশ্চিতভাবে সমর্থিত ইমোজি
+    emojis = ["👍", "❤️", "🔥"]
+
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
@@ -33,9 +39,10 @@ def handle_reaction(msg):
             'reaction': json.dumps(reaction_list)
         }
         r = requests.post(url, json=payload, timeout=5)
-        if r.json().get('ok'):
-            logger.info(f"✅ 11 reactions sent to msg {message_id}")
+        data = r.json()
+        if data.get('ok'):
+            logger.info(f"✅ 3 reactions sent to msg {message_id} in {chat_id}")
         else:
-            logger.error(f"❌ Reaction failed: {r.text}")
+            logger.error(f"❌ React failed: {data}")
     except Exception as e:
         logger.error(f"Reaction error: {e}")
