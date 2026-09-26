@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('md_bot', __name__, url_prefix='/bot')
 
 # ========== Bot Configuration ==========
-BOT_TOKEN = "8193376363:AAFyFu4HySboXZcS45qJ1Lct2foJaTqyitM"
-BOT_USERNAME = "@Arif1222_bot"
+BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1Lcpus1Z2iz6kOORo"
 
 # ========== MongoDB ==========
 MONGO_URI = "mongodb+srv://Cyber_md_bot:cybermd123@cluster0.tre505e.mongodb.net/?appName=Cluster0"
@@ -21,7 +20,7 @@ client = MongoClient(MONGO_URI)
 db = client['cyber_tools']
 group_col = db['group_settings']
 
-# ========== Auto Replies ==========
+# ========== Auto Replies (Keyword) ==========
 AUTO_REPLIES = {
     'hi': '<b>Hello!</b> <i>How are you?</i> 😊',
     'hello': '<b>Hello!</b> <i>How can I help you?</i>',
@@ -29,6 +28,86 @@ AUTO_REPLIES = {
     'good night': '<b>🌙 Good Night!</b> Sweet dreams!',
     'how are you': '<i>I am just a bot, but I am doing great!</i> 😄',
 }
+
+# ========== AI System Prompt (ai_chat.py থেকে) ==========
+AI_SYSTEM_PROMPT = """You are "Arif" – an AI with sharp wit, bold attitude, and flawless language skills. Developer: Arif.
+
+CRITICAL RULES (MUST FOLLOW):
+1. SPELLING & GRAMMAR: Your replies must have ZERO spelling mistakes. Use correct grammar. If writing in Bengali, ensure proper Bengali spelling (শুদ্ধ বানান). If English, proper English.
+2. FUNNY + ATTITUDE: Be sarcastic, witty, and slightly arrogant but in a charming way. Make the user laugh or smirk with your reply.
+3. CONTEXTUAL: Your answer must directly match the user's question. If they ask about cricket, talk cricket. If they ask for help, give the actual solution.
+4. MULTI-LANGUAGE: Reply in the EXACT SAME LANGUAGE as the user (Bengali, English, Hindi, Urdu, etc.).
+5. ABUSE HANDLING: If the user uses bad words, reply with STRONGER, FUNNIER, and MORE CREATIVE abuse. Don't hold back.
+6. I DON'T KNOW: If you genuinely don't know something, say "I don't know" directly – no bluffing.
+7. BREVITY: Keep replies concise (2-4 sentences), punchy, and impactful. No long essays unless asked.
+
+Remember: You are Arif. You are not a boring robot. You are the funniest, sharpest, and most fluent AI in the room."""
+
+# ========== AI Reply Function ==========
+def get_ai_reply(user_message, chat_title="a Telegram group"):
+    """notrack.ai API কল করে AI উত্তর নেয়"""
+    try:
+        context = ""
+        full_prompt = f"{AI_SYSTEM_PROMPT}\n\n--- Group: {chat_title} ---\nUser: {user_message}\nArif:"
+        
+        payload = {
+            "user_input": full_prompt,
+            "mode": "usual",
+            "model": "C",
+            "persona": "normal",
+            "max_turns": 6,
+            "chat_id": None,
+            "attachments": [],
+            "regenerate": False,
+            "edit": False,
+            "edit_mid": None
+        }
+        
+        resp = requests.post(
+            'https://notrack.ai/api/dispatch',
+            json=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Origin': 'https://notrack.ai',
+                'Referer': 'https://notrack.ai/chat',
+                'User-Agent': 'Mozilla/5.0'
+            },
+            timeout=60,
+            stream=True
+        )
+        
+        if resp.status_code != 200:
+            logger.error(f"AI server error: {resp.status_code}")
+            return None
+        
+        full = ''
+        buf = ''
+        for chunk in resp.iter_content(chunk_size=None, decode_unicode=True):
+            if chunk:
+                buf += chunk
+                parts = buf.split('\n\n')
+                buf = parts.pop()
+                for part in parts:
+                    if part.startswith('data: '):
+                        raw = part[6:].strip()
+                        if not raw:
+                            continue
+                        try:
+                            d = json.loads(raw)
+                            if d.get('type') == 'delta' and d.get('chunk'):
+                                full += d['chunk']
+                        except:
+                            pass
+        
+        if full.strip():
+            return full.strip()
+        return None
+    except requests.exceptions.Timeout:
+        logger.error("AI timeout")
+        return None
+    except Exception as e:
+        logger.error(f"AI error: {e}")
+        return None
 
 # ========== Group Settings ==========
 def get_group(chat_id):
@@ -50,10 +129,10 @@ def register_group(chat_id, title):
                 'auto_react': 'off',
                 'auto_welcome': 'off',
                 'auto_reply': 'off',
+                'ai_reply': 'off',
                 'moderation_enabled': 'off',
-                'warn_limit': '3',
-                'bad_words': '[]',
-                'anti_link': 'off'
+                'anti_link': 'off',
+                'warn_limit': '3'
             }
         },
         upsert=True
@@ -84,7 +163,7 @@ def send_message(chat_id, text, parse_mode='HTML', reply_markup=None, disable_pr
         }
         if reply_markup:
             payload['reply_markup'] = reply_markup
-        r = requests.post(url, json=payload, timeout=5)
+        r = requests.post(url, json=payload, timeout=10)
         return r.json().get('ok', False)
     except Exception as e:
         logger.error(f"Send error: {e}")
@@ -117,9 +196,15 @@ def delete_message(chat_id, message_id):
     except:
         return False
 
+def send_chat_action(chat_id, action='typing'):
+    try:
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendChatAction",
+                     json={'chat_id': chat_id, 'action': action}, timeout=5)
+    except:
+        pass
+
 # ========== Permission Check ==========
 def get_user_status(chat_id, user_id):
-    """Returns: 'creator', 'administrator', 'member', 'restricted', 'left', 'kicked'"""
     try:
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember",
                         params={'chat_id': chat_id, 'user_id': user_id}, timeout=5)
@@ -131,8 +216,7 @@ def get_user_status(chat_id, user_id):
     return 'member'
 
 def is_admin(chat_id, user_id):
-    status = get_user_status(chat_id, user_id)
-    return status in ('administrator', 'creator')
+    return get_user_status(chat_id, user_id) in ('administrator', 'creator')
 
 def is_owner(chat_id, user_id):
     return get_user_status(chat_id, user_id) == 'creator'
@@ -145,9 +229,9 @@ def get_panel_text(chat_id):
     react = '✅ ON' if doc.get('auto_react') == 'on' else '❌ OFF'
     welcome = '✅ ON' if doc.get('auto_welcome') == 'on' else '❌ OFF'
     reply = '✅ ON' if doc.get('auto_reply') == 'on' else '❌ OFF'
+    ai = '✅ ON' if doc.get('ai_reply') == 'on' else '❌ OFF'
     mod = '✅ ON' if doc.get('moderation_enabled') == 'on' else '❌ OFF'
-    anti_link = '✅ ON' if doc.get('anti_link') == 'on' else '❌ OFF'
-    warn_limit = doc.get('warn_limit', '3')
+    anti = '✅ ON' if doc.get('anti_link') == 'on' else '❌ OFF'
 
     return f"""<b>⚙️ Cyber Tools MD — Control Panel</b>
 
@@ -158,10 +242,10 @@ def get_panel_text(chat_id):
 
 🔹 <b>Auto React:</b> {react}
 🔹 <b>Auto Welcome:</b> {welcome}
-🔹 <b>Auto Reply:</b> {reply}
+🔹 <b>Auto Reply (keywords):</b> {reply}
+🔹 <b>🤖 AI Reply:</b> {ai}
 🔹 <b>Moderation:</b> {mod}
-🔹 <b>Anti-Link:</b> {anti_link}
-🔹 <b>Warn Limit:</b> {warn_limit}
+🔹 <b>Anti-Link:</b> {anti}
 
 <i>👇 Tap any button below to toggle:</i>"""
 
@@ -177,6 +261,7 @@ def get_panel_keyboard(chat_id):
             [btn('Auto React', 'auto_react')],
             [btn('Auto Welcome', 'auto_welcome')],
             [btn('Auto Reply', 'auto_reply')],
+            [btn('🤖 AI Reply', 'ai_reply')],
             [btn('Moderation', 'moderation_enabled')],
             [btn('Anti-Link', 'anti_link')],
             [{'text': '🔄 Refresh', 'callback_data': 'refresh_panel'}],
@@ -196,7 +281,6 @@ def handle_user_commands(msg):
     if chat_type in ('group', 'supergroup'):
         register_group(chat_id, chat_title)
 
-    # /start
     if text == '/start':
         if chat_type in ('group', 'supergroup'):
             send_message(chat_id, f"""<b>🛡️ Cyber Tools MD — Bot is LIVE</b> 🚀
@@ -204,11 +288,7 @@ def handle_user_commands(msg):
 <b>👤 Member Commands:</b>
 /help — Show all commands
 /settings — View group settings
-/bold [text] — <b>Bold text</b>
-/italic [text] — <i>Italic text</i>
-/code [text] — <code>Code text</code>
-/strike [text] — <s>Strike text</s>
-/echo [text] — All formats
+/bold, /italic, /code, /strike, /echo
 
 <b>👮 Admin Commands:</b>
 /panel — Interactive control panel
@@ -216,72 +296,52 @@ def handle_user_commands(msg):
 /warn, /warns, /delwarn
 /del, /pin, /unpin
 
-<b>💬 Auto Reply:</b> hi, hello, good morning, good night
-<i>(When enabled by admins)</i>""")
+<b>🤖 AI Reply:</b> When enabled, I reply to any message with AI!""")
         else:
             send_message(chat_id, f"""<b>🛡️ Cyber Tools MD</b> 🚀
 
-Hello! I am a multi-purpose Telegram bot.
+Hello! I am a multi-purpose Telegram bot with AI support.
 
-<b>To get started:</b>
-Add me to a group, then type <code>/settings</code> there.
+<b>Add me to a group</b>, then type <code>/settings</code> to control me.
 
-<b>📝 Available Commands:</b>
-/help — Show all commands
-/bold [text] — <b>Bold</b>
-/italic [text] — <i>Italic</i>
-/code [text] — <code>Code</code>
-/strike [text] — <s>Strike</s>
-/echo [text] — All formats""")
+<b>📝 Commands:</b>
+/help, /bold, /italic, /code, /strike, /echo""")
 
-    # /help
     elif text == '/help':
         send_message(chat_id, """<b>📚 Cyber Tools MD — All Commands</b>
 
-<b>🎨 Text Formatting (Everyone):</b>
+<b>🎨 Formatting (Everyone):</b>
 /bold [text] — <b>Bold</b>
 /italic [text] — <i>Italic</i>
 /code [text] — <code>Code</code>
 /strike [text] — <s>Strike</s>
 /echo [text] — All combined
 
-<b>⚙️ Settings (Everyone can view, Admins can change):</b>
+<b>⚙️ Settings:</b>
 /settings — View group settings
-/panel — Interactive control panel (Admins only)
+/panel — Control panel (Admins only)
 
 <b>👮 Admin Only:</b>
-/ban @user — Ban a member
-/kick @user — Kick a member
-/mute @user — Mute a member
-/unmute @user — Unmute
-/warn @user — Give warning
-/warns @user — Show warnings
-/delwarn @user — Reset warnings
-/del — Delete replied message
-/pin — Pin replied message
-/unpin — Unpin message
+/ban, /kick, /mute, /unmute
+/warn, /warns, /delwarn
+/del, /pin, /unpin
 
 <b>👑 Owner Only:</b>
-/promote @user — Make admin
-/demote @user — Remove admin
-/stats — Group statistics
+/promote, /demote, /stats, /resetgroup
 
-<b>💬 Auto Reply (when enabled):</b>
-hi, hello, good morning, good night""")
+<b>🤖 AI Reply:</b> When enabled, just send any message and I reply with AI!""")
 
-    # /settings (view only)
     elif text == '/settings':
         if chat_type == 'private':
-            send_message(chat_id, "⚠️ <b>Settings only work in groups.</b>\n\nAdd me to a group and type /settings there.")
+            send_message(chat_id, "⚠️ Settings only work in groups.")
             return
-        
         doc = get_group(chat_id) or {}
         react = '✅ ON' if doc.get('auto_react') == 'on' else '❌ OFF'
         welcome = '✅ ON' if doc.get('auto_welcome') == 'on' else '❌ OFF'
         reply = '✅ ON' if doc.get('auto_reply') == 'on' else '❌ OFF'
+        ai = '✅ ON' if doc.get('ai_reply') == 'on' else '❌ OFF'
         mod = '✅ ON' if doc.get('moderation_enabled') == 'on' else '❌ OFF'
         anti = '✅ ON' if doc.get('anti_link') == 'on' else '❌ OFF'
-        
         send_message(chat_id, f"""<b>⚙️ Group Settings</b>
 
 📍 <b>{chat_title}</b>
@@ -289,24 +349,21 @@ hi, hello, good morning, good night""")
 🔹 Auto React: {react}
 🔹 Auto Welcome: {welcome}
 🔹 Auto Reply: {reply}
+🔹 🤖 AI Reply: {ai}
 🔹 Moderation: {mod}
 🔹 Anti-Link: {anti}
 
-<i>Only group admins can change these settings.</i>
 <i>Admins: use /panel to toggle.</i>""")
 
-    # /panel (admin only)
     elif text == '/panel':
         if chat_type == 'private':
             send_message(chat_id, "⚠️ Panel only works in groups.")
             return
-        user_id = msg['from']['id']
-        if not is_admin(chat_id, user_id):
-            send_message(chat_id, "⛔ <b>Access Denied.</b>\nOnly group admins can use the control panel.")
+        if not is_admin(chat_id, msg['from']['id']):
+            send_message(chat_id, "⛔ <b>Admins only.</b>")
             return
         send_message(chat_id, get_panel_text(chat_id), reply_markup=get_panel_keyboard(chat_id))
 
-    # Formatting commands (everyone)
     elif text.startswith('/bold '):
         send_message(chat_id, f"<b>{text[6:]}</b>")
     elif text.startswith('/italic '):
@@ -321,8 +378,8 @@ hi, hello, good morning, good night""")
 # ========== Admin Commands ==========
 def get_target_user(msg, chat_id):
     if 'reply_to_message' in msg:
-        target = msg['reply_to_message']['from']
-        return target['id'], target.get('first_name', target.get('username', 'User'))
+        t = msg['reply_to_message']['from']
+        return t['id'], t.get('first_name', t.get('username', 'User'))
     parts = msg.get('text', '').split()
     if len(parts) > 1:
         username = parts[1].strip().lstrip('@')
@@ -344,157 +401,111 @@ def handle_admin_commands(msg):
     chat_id = msg['chat']['id']
     user_id = msg['from']['id']
     chat_type = msg.get('chat', {}).get('type', 'private')
-
     if chat_type == 'private':
         return
 
-    # Admin commands list
+    cmd = text.split()[0] if text.split() else ''
     admin_cmds = ['/ban', '/kick', '/mute', '/unmute', '/warn', '/warns', '/delwarn', '/del', '/pin', '/unpin']
     owner_cmds = ['/promote', '/demote', '/stats', '/resetgroup']
 
-    # Check if command is admin/owner type
-    cmd = text.split()[0] if text.split() else ''
     if cmd not in admin_cmds + owner_cmds:
         return
 
-    # Permission check
     if cmd in owner_cmds:
         if not is_owner(chat_id, user_id):
-            send_message(chat_id, "⛔ <b>Owner only command.</b>")
+            send_message(chat_id, "⛔ <b>Owner only.</b>")
             return
     else:
         if not is_admin(chat_id, user_id):
             send_message(chat_id, "⛔ <b>Admins only.</b>")
             return
 
-    # /del
     if cmd == '/del':
         if 'reply_to_message' in msg:
             if delete_message(chat_id, msg['reply_to_message']['message_id']):
-                send_message(chat_id, "🗑️ Message deleted.")
-            else:
-                send_message(chat_id, "❌ Failed to delete.")
+                send_message(chat_id, "🗑️ Deleted.")
         else:
-            send_message(chat_id, "❌ Reply to a message to delete it.")
+            send_message(chat_id, "❌ Reply to a message.")
         return
 
-    # /pin
     if cmd == '/pin':
         if 'reply_to_message' in msg:
             r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/pinChatMessage",
                             params={'chat_id': chat_id, 'message_id': msg['reply_to_message']['message_id']}, timeout=5)
-            send_message(chat_id, "📌 Pinned." if r.json().get('ok') else "❌ Failed to pin.")
+            send_message(chat_id, "📌 Pinned." if r.json().get('ok') else "❌ Failed.")
         else:
-            send_message(chat_id, "❌ Reply to a message to pin it.")
+            send_message(chat_id, "❌ Reply to a message.")
         return
 
-    # /unpin
     if cmd == '/unpin':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/unpinAllChatMessages",
                         params={'chat_id': chat_id}, timeout=5)
         send_message(chat_id, "📌 Unpinned." if r.json().get('ok') else "❌ Failed.")
         return
 
-    # /stats (owner)
     if cmd == '/stats':
         doc = get_group(chat_id) or {}
         send_message(chat_id, f"""<b>📊 Group Statistics</b>
 
-📍 <b>Group:</b> {doc.get('title', 'Unknown')}
-🆔 <b>ID:</b> <code>{chat_id}</code>
+📍 <b>{doc.get('title', 'Unknown')}</b>
+🆔 <code>{chat_id}</code>
 
-<b>Settings:</b>
 🔹 Auto React: {doc.get('auto_react', 'off').upper()}
 🔹 Auto Welcome: {doc.get('auto_welcome', 'off').upper()}
 🔹 Auto Reply: {doc.get('auto_reply', 'off').upper()}
+🔹 AI Reply: {doc.get('ai_reply', 'off').upper()}
 🔹 Moderation: {doc.get('moderation_enabled', 'off').upper()}
 🔹 Anti-Link: {doc.get('anti_link', 'off').upper()}""")
         return
 
-    # /resetgroup (owner)
     if cmd == '/resetgroup':
-        set_group_setting(chat_id, 'auto_react', 'off')
-        set_group_setting(chat_id, 'auto_welcome', 'off')
-        set_group_setting(chat_id, 'auto_reply', 'off')
-        set_group_setting(chat_id, 'moderation_enabled', 'off')
-        set_group_setting(chat_id, 'anti_link', 'off')
-        send_message(chat_id, "✅ All settings reset to OFF.")
+        for k in ['auto_react', 'auto_welcome', 'auto_reply', 'ai_reply', 'moderation_enabled', 'anti_link']:
+            set_group_setting(chat_id, k, 'off')
+        send_message(chat_id, "✅ All settings reset.")
         return
 
-    # User-target commands
     target_id, target_name = get_target_user(msg, chat_id)
     if not target_id:
-        send_message(chat_id, "❌ Reply to a user's message or use @username.")
+        send_message(chat_id, "❌ Reply or use @username.")
         return
-
-    # Prevent self-moderation
     if target_id == user_id:
-        send_message(chat_id, "❌ You cannot perform this action on yourself.")
+        send_message(chat_id, "❌ Cannot target yourself.")
         return
 
-    # /ban
     if cmd == '/ban':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/banChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id}, timeout=5)
-        if r.json().get('ok'):
-            send_message(chat_id, f"🔨 <b>{target_name}</b> has been banned.")
-        else:
-            send_message(chat_id, f"❌ Failed: {r.json().get('description', 'Unknown error')}")
-
-    # /kick
+        send_message(chat_id, f"🔨 <b>{target_name}</b> banned." if r.json().get('ok') else f"❌ {r.json().get('description')}")
     elif cmd == '/kick':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/banChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id}, timeout=5)
         if r.json().get('ok'):
             requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/unbanChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id}, timeout=5)
-            send_message(chat_id, f"🚪 <b>{target_name}</b> has been kicked.")
-        else:
-            send_message(chat_id, f"❌ Failed: {r.json().get('description', 'Unknown error')}")
-
-    # /mute
+            send_message(chat_id, f"🚪 <b>{target_name}</b> kicked.")
     elif cmd == '/mute':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/restrictChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id,
                                 'permissions': json.dumps({'can_send_messages': False})}, timeout=5)
-        if r.json().get('ok'):
-            send_message(chat_id, f"🔇 <b>{target_name}</b> has been muted.")
-        else:
-            send_message(chat_id, f"❌ Failed: {r.json().get('description', 'Unknown error')}")
-
-    # /unmute
+        send_message(chat_id, f"🔇 <b>{target_name}</b> muted." if r.json().get('ok') else "❌ Failed.")
     elif cmd == '/unmute':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/restrictChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id,
                                 'permissions': json.dumps({'can_send_messages': True})}, timeout=5)
-        if r.json().get('ok'):
-            send_message(chat_id, f"🔊 <b>{target_name}</b> has been unmuted.")
-        else:
-            send_message(chat_id, f"❌ Failed: {r.json().get('description', 'Unknown error')}")
-
-    # /promote (owner)
+        send_message(chat_id, f"🔊 <b>{target_name}</b> unmuted." if r.json().get('ok') else "❌ Failed.")
     elif cmd == '/promote':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/promoteChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id,
                                 'can_manage_chat': True, 'can_delete_messages': True,
                                 'can_restrict_members': True, 'can_pin_messages': True}, timeout=5)
-        if r.json().get('ok'):
-            send_message(chat_id, f"👑 <b>{target_name}</b> is now an admin.")
-        else:
-            send_message(chat_id, f"❌ Failed: {r.json().get('description', 'Unknown error')}")
-
-    # /demote (owner)
+        send_message(chat_id, f"👑 <b>{target_name}</b> promoted." if r.json().get('ok') else "❌ Failed.")
     elif cmd == '/demote':
         r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/promoteChatMember",
                         params={'chat_id': chat_id, 'user_id': target_id,
                                 'can_manage_chat': False, 'can_delete_messages': False,
                                 'can_restrict_members': False, 'can_pin_messages': False}, timeout=5)
-        if r.json().get('ok'):
-            send_message(chat_id, f"🛡️ <b>{target_name}</b>'s admin rights removed.")
-        else:
-            send_message(chat_id, f"❌ Failed: {r.json().get('description', 'Unknown error')}")
-
-# ========== Callback (Button Tap) Handler ==========
+        send_message(chat_id, f"🛡️ <b>{target_name}</b> demoted." if r.json().get('ok') else "❌ Failed.")
+# ========== Callback Handler ==========
 def handle_callback(cb):
     cb_id = cb['id']
     chat_id = cb['message']['chat']['id']
@@ -515,7 +526,6 @@ def handle_callback(cb):
         set_group_setting(chat_id, key, new_val)
         answer_callback(cb_id, f"{key.replace('_', ' ').title()}: {new_val.upper()}")
 
-    # Update panel
     try:
         edit_message(chat_id, message_id, get_panel_text(chat_id), reply_markup=get_panel_keyboard(chat_id))
     except Exception as e:
@@ -530,31 +540,43 @@ def send_reactions(chat_id, message_id):
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
         payload = {'chat_id': chat_id, 'message_id': message_id, 'reaction': json.dumps(reaction_list)}
-        r = requests.post(url, json=payload, timeout=10)
-        data = r.json()
-        if data.get('ok'):
-            logger.info(f"✅ Reactions sent to {message_id}")
-        else:
-            logger.error(f"❌ React failed: {data}")
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        logger.error(f"❌ React error: {e}")
+        logger.error(f"React error: {e}")
 
 processed_messages = set()
 
 def handle_auto_reply(msg):
-    if get_group_setting(msg['chat']['id'], 'auto_reply') != 'on':
-        return
-    text = msg.get('text', '').lower().strip()
-    if not text:
+    """AI Reply (priority) → Keyword Reply (fallback)"""
+    chat_id = msg['chat']['id']
+    text = msg.get('text', '').strip()
+    if not text or text.startswith('/'):
         return
     mid = msg['message_id']
     if mid in processed_messages:
         return
     processed_messages.add(mid)
-    for keyword, reply in AUTO_REPLIES.items():
-        if keyword in text:
-            send_message(msg['chat']['id'], reply)
-            break
+
+    # 1️⃣ AI Reply (priority)
+    if get_group_setting(chat_id, 'ai_reply') == 'on':
+        send_chat_action(chat_id, 'typing')
+        chat_title = msg['chat'].get('title', 'a group')
+        logger.info(f"🤖 AI replying to: {text[:50]}")
+        ai_response = get_ai_reply(text, chat_title)
+        if ai_response:
+            send_message(chat_id, ai_response)
+            logger.info(f"✅ AI reply sent")
+            return
+        else:
+            logger.warning("⚠️ AI failed, falling back to keyword")
+
+    # 2️⃣ Keyword Reply (fallback)
+    if get_group_setting(chat_id, 'auto_reply') == 'on':
+        lower = text.lower()
+        for keyword, reply in AUTO_REPLIES.items():
+            if keyword in lower:
+                send_message(chat_id, reply)
+                break
 
 def handle_welcome(msg):
     if get_group_setting(msg['chat']['id'], 'auto_welcome') != 'on':
@@ -566,7 +588,7 @@ def handle_welcome(msg):
         name = member.get('first_name', 'Guest')
         send_message(chat_id, f"<b>🎉 Welcome {name}!</b> 🥳\n\nGlad to have you here. Type /help to see what I can do!")
 
-# ========== Moderation (Optional) ==========
+# ========== Moderation ==========
 MODERATION_AVAILABLE = False
 try:
     from md_tools import moderation
@@ -603,7 +625,6 @@ def polling_worker():
             for update in data.get('result', []):
                 last_update_id = update['update_id']
 
-                # Callback query
                 if 'callback_query' in update:
                     try:
                         handle_callback(update['callback_query'])
@@ -617,11 +638,9 @@ def polling_worker():
 
                 chat_id = msg['chat']['id']
                 chat_type = msg['chat'].get('type')
-
                 if chat_type in ('group', 'supergroup'):
                     register_group(chat_id, msg['chat'].get('title', 'Group'))
 
-                # Bot added to group
                 if 'new_chat_members' in msg:
                     for member in msg['new_chat_members']:
                         if BOT_ID and member.get('id') == BOT_ID:
@@ -630,12 +649,10 @@ def polling_worker():
 <b>Admins:</b> Use /panel to control this group
 <b>Everyone:</b> Use /help to see commands""")
 
-                # Bot removed
                 if 'left_chat_member' in msg:
                     if BOT_ID and msg['left_chat_member'].get('id') == BOT_ID:
                         group_col.delete_one({'chat_id': chat_id})
 
-                # Process message
                 logger.info(f"📩 Received: {msg.get('text', '[non-text]')}")
                 handle_user_commands(msg)
                 handle_admin_commands(msg)
@@ -665,4 +682,4 @@ def start_polling_thread():
     logger.info("🚀 Polling thread started.")
 
 start_polling_thread()
-logger.info("✅ md_bot module loaded.")
+logger.info("✅ md_bot module loaded with AI Reply.")
