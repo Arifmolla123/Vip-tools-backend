@@ -31,7 +31,7 @@ AUTO_REPLIES = {
     'how are you': '<i>I\'m just a bot, but I\'m doing fine!</i> 😄',
 }
 
-# ========== গ্রুপ সেটিংস ==========
+# ========== গ্রুপ সেটিংস ফাংশন ==========
 def get_group(chat_id):
     return group_col.find_one({'chat_id': chat_id})
 
@@ -76,7 +76,7 @@ def fetch_bot_id():
     except Exception as e:
         logger.error(f"Bot ID fetch error: {e}")
 
-# ========== ড্যাশবোর্ড ==========
+# ========== ড্যাশবোর্ড রাউট ==========
 @bp.route('/', methods=['GET', 'POST'])
 def dashboard():
     chat_id = request.args.get('chat_id', type=int)
@@ -109,6 +109,7 @@ def dashboard():
         title=group.get('title', 'Unknown Group')
     )
 
+# ========== HTML: গ্রুপ লিস্ট ==========
 GROUP_LIST_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -157,6 +158,7 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 </html>
 '''
 
+# ========== HTML: নির্দিষ্ট গ্রুপের ড্যাশবোর্ড ==========
 DASHBOARD_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -241,12 +243,11 @@ def send_message(chat_id, text, parse_mode='HTML'):
         return False
 
 def send_reactions(chat_id, message_id):
-    """প্রতিটি গ্রুপের নিজস্ব auto_react সেটিং অনুযায়ী ৩টি রিয়েক্ট পাঠায়"""
+    """গ্রুপের auto_react সেটিং অনুযায়ী ৩টি রিয়েক্ট পাঠায়"""
     setting = get_group_setting(chat_id, 'auto_react')
-    logger.info(f"🔍 React check: chat_id={chat_id}, auto_react='{setting}', msg_id={message_id}")
+    logger.info(f"🔍 React check: chat_id={chat_id}, auto_react='{setting}'")
     
     if setting != 'on':
-        logger.info(f"⏸️ Skipped (setting is '{setting}')")
         return
     
     emojis = ["👍", "❤️", "🔥"]
@@ -257,7 +258,7 @@ def send_reactions(chat_id, message_id):
         r = requests.post(url, json=payload, timeout=10)
         data = r.json()
         if data.get('ok'):
-            logger.info(f"✅ Reactions sent to {message_id} in {chat_id}")
+            logger.info(f"✅ Reactions sent to {message_id}")
         else:
             logger.error(f"❌ React failed: {data}")
     except Exception as e:
@@ -328,13 +329,15 @@ I reply to hi, good morning, good night, etc. (if enabled in your group)."""
     if reply:
         send_message(chat_id, reply)
 
-# ========== মডারেশন ইমপোর্ট ==========
+# ========== মডারেশন (অপশনাল) ==========
+MODERATION_AVAILABLE = False
 try:
     from md_tools import moderation
     MODERATION_AVAILABLE = True
-except ImportError:
-    MODERATION_AVAILABLE = False
-    logger.warning("⚠️ moderation module not found")
+    bp.register_blueprint(moderation.bp)
+    logger.info("✅ moderation loaded")
+except Exception as e:
+    logger.warning(f"⚠️ moderation not loaded: {e}")
 
 # ========== পোলিং ==========
 def polling_worker():
@@ -398,8 +401,11 @@ def polling_worker():
                 handle_welcome(msg)
 
                 if MODERATION_AVAILABLE and get_group_setting(chat_id, 'moderation_enabled') == 'on':
-                    moderation.handle_moderation(msg, BOT_TOKEN)
-                    moderation.handle_admin_commands(msg, BOT_TOKEN)
+                    try:
+                        moderation.handle_moderation(msg, BOT_TOKEN)
+                        moderation.handle_admin_commands(msg, BOT_TOKEN)
+                    except Exception as e:
+                        logger.error(f"Moderation error: {e}")
 
             time.sleep(1)
         except Exception as e:
@@ -417,18 +423,4 @@ def start_polling_thread():
     logger.info("🚀 Polling thread started.")
 
 start_polling_thread()
-logger.info("✅ md_bot module loaded with per-group settings.")
-
-# ========== মডারেশন ব্লুপ্রিন্ট ==========
-if MODERATION_AVAILABLE:
-    bp.register_blueprint(moderation.bp)
-
-# ========== md_tools ==========
-try:
-    from md_tools import preview, converter, formatter
-    bp.register_blueprint(preview.bp)
-    bp.register_blueprint(converter.bp)
-    bp.register_blueprint(formatter.bp)
-    logger.info("✅ md_tools loaded.")
-except ImportError:
-    pass
+logger.info("✅ md_bot module loaded.")
