@@ -2,8 +2,7 @@ import requests
 import logging
 
 logger = logging.getLogger(__name__)
-BOT_TOKEN = "8193376363:AAHTTtXNtQqCZ2a_Hd1cpus1Z2iz6kOORo"
-
+BOT_TOKEN = "8193376363:AAFyMyVmK7gryI4H1ZxZOobwFt_wzeFwJrM"
 def handle_new_member(msg):
     if 'new_chat_members' not in msg:
         return
