@@ -31,7 +31,7 @@ AUTO_REPLIES = {
     'how are you': '<i>I\'m just a bot, but I\'m doing fine!</i> 😄',
 }
 
-# ========== গ্রুপ সেটিংস ফাংশন ==========
+# ========== গ্রুপ সেটিংস ==========
 def get_group(chat_id):
     return group_col.find_one({'chat_id': chat_id})
 
@@ -109,7 +109,16 @@ def dashboard():
         title=group.get('title', 'Unknown Group')
     )
 
-# ========== HTML: গ্রুপ লিস্ট ==========
+# ========== 🗑️ গ্রুপ ডিলিট রাউট ==========
+@bp.route('/delete_group', methods=['POST'])
+def delete_group():
+    chat_id = request.form.get('chat_id', type=int)
+    if chat_id:
+        remove_group(chat_id)
+        logger.info(f"🗑️ Deleted group {chat_id} from dashboard")
+    return redirect('/bot/')
+
+# ========== HTML: গ্রুপ লিস্ট (ডিলিট বাটনসহ) ==========
 GROUP_LIST_HTML = '''
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -124,10 +133,13 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
 .btn-open { display:block; background:#1f6feb; color:#fff; text-align:center; padding:14px; border-radius:14px; font-size:17px; font-weight:600; text-decoration:none; margin-bottom:24px; }
 .btn-open:hover { background:#388bfd; }
 .divider { border:none; border-top:1px solid #30363d; margin:20px 0; }
-.group-item { display:flex; justify-content:space-between; align-items:center; background:#0d1117; padding:14px 18px; border-radius:14px; margin-bottom:10px; text-decoration:none; color:#c9d1d9; border:1px solid #21262d; transition:all 0.2s; }
+.group-row { display:flex; gap:8px; margin-bottom:10px; align-items:stretch; }
+.group-item { flex:1; display:flex; justify-content:space-between; align-items:center; background:#0d1117; padding:14px 18px; border-radius:14px; text-decoration:none; color:#c9d1d9; border:1px solid #21262d; transition:all 0.2s; }
 .group-item:hover { background:#1c2333; border-color:#58a6ff; }
-.group-title { font-weight:500; font-size:15px; color:#f0f6fc; }
-.group-arrow { color:#58a6ff; font-size:18px; }
+.group-title { font-weight:500; font-size:15px; color:#f0f6fc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.group-arrow { color:#58a6ff; font-size:18px; margin-left:8px; }
+.delete-btn { background:#21262d; color:#f85149; border:1px solid #30363d; padding:0 16px; border-radius:14px; font-size:16px; cursor:pointer; transition:all 0.2s; }
+.delete-btn:hover { background:#f85149; color:#fff; border-color:#f85149; }
 .empty { text-align:center; color:#8b949e; padding:30px 10px; font-size:14px; line-height:1.7; }
 .footer { text-align:center; color:#484f58; font-size:12px; margin-top:20px; }
 </style>
@@ -141,10 +153,16 @@ h1 { color:#f0f6fc; font-size:24px; margin-bottom:4px; }
     <hr class="divider">
     {% if groups %}
         {% for g in groups %}
-        <a href="/bot/?chat_id={{ g.chat_id }}" class="group-item">
-            <span class="group-title">🏠 {{ g.title or 'Unnamed Group' }}</span>
-            <span class="group-arrow">→</span>
-        </a>
+        <div class="group-row">
+            <a href="/bot/?chat_id={{ g.chat_id }}" class="group-item">
+                <span class="group-title">🏠 {{ g.title or 'Unnamed Group' }}</span>
+                <span class="group-arrow">→</span>
+            </a>
+            <form method="post" action="/bot/delete_group" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this group?');">
+                <input type="hidden" name="chat_id" value="{{ g.chat_id }}">
+                <button type="submit" class="delete-btn" title="Delete">🗑️</button>
+            </form>
+        </div>
         {% endfor %}
     {% else %}
         <div class="empty">
@@ -180,15 +198,24 @@ h1 { color:#f0f6fc; font-size:22px; margin-bottom:4px; word-break:break-word; }
 .save-btn { width:100%; background:#238636; color:#fff; border:none; padding:14px; border-radius:14px; font-size:17px; font-weight:600; cursor:pointer; margin-top:12px; }
 .save-btn:hover { background:#2ea043; }
 .footer { text-align:center; color:#484f58; font-size:12px; margin-top:20px; }
-.back-link { display:inline-block; margin-bottom:16px; color:#58a6ff; text-decoration:none; font-size:14px; }
+.top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.back-link { color:#58a6ff; text-decoration:none; font-size:14px; }
 .back-link:hover { text-decoration:underline; }
+.delete-top { background:#21262d; color:#f85149; border:1px solid #30363d; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+.delete-top:hover { background:#f85149; color:#fff; border-color:#f85149; }
 .mod-link { display:inline-block; margin-top:10px; color:#58a6ff; text-decoration:none; font-size:14px; }
 .mod-link:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
 <div class="card">
-    <a href="/bot/" class="back-link">← All Groups</a>
+    <div class="top-bar">
+        <a href="/bot/" class="back-link">← All Groups</a>
+        <form method="post" action="/bot/delete_group" style="margin:0;" onsubmit="return confirm('Delete this group from dashboard?');">
+            <input type="hidden" name="chat_id" value="{{ chat_id }}">
+            <button type="submit" class="delete-top">🗑️ Delete</button>
+        </form>
+    </div>
     <h1>🛡️ {{ title }}</h1>
     <div class="sub">Group Control Panel</div>
     <div class="badge">● Active</div>
@@ -243,13 +270,10 @@ def send_message(chat_id, text, parse_mode='HTML'):
         return False
 
 def send_reactions(chat_id, message_id):
-    """গ্রুপের auto_react সেটিং অনুযায়ী ৩টি রিয়েক্ট পাঠায়"""
     setting = get_group_setting(chat_id, 'auto_react')
     logger.info(f"🔍 React check: chat_id={chat_id}, auto_react='{setting}'")
-    
     if setting != 'on':
         return
-    
     emojis = ["👍", "❤️", "🔥"]
     try:
         reaction_list = [{"type": "emoji", "emoji": e} for e in emojis]
