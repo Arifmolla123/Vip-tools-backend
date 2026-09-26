@@ -1,26 +1,12 @@
-import requests
-import logging
+from .config import get_group_setting, send_message
 
-logger = logging.getLogger(__name__)
-BOT_TOKEN = "8193376363:AAFyMyVmK7gryI4H1ZxZOobwFt_wzeFwJrM"
-def handle_new_member(msg):
+def handle_welcome(msg):
+    chat_id = msg['chat']['id']
+    if get_group_setting(chat_id, 'auto_welcome') != 'on':
+        return
     if 'new_chat_members' not in msg:
         return
-    chat_id = msg['chat']['id']
     for member in msg['new_chat_members']:
         name = member.get('first_name', 'Guest')
-        logger.info(f"👤 New member: {name}")
-        welcome = f"<b>🎉 Welcome {name}!</b> 🥳\nGlad to have you here. Type /start to see what I can do."
-        try:
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            r = requests.post(url, json={
-                'chat_id': chat_id,
-                'text': welcome,
-                'parse_mode': 'HTML'
-            }, timeout=5)
-            if r.json().get('ok'):
-                logger.info(f"✅ Welcome sent to {name}")
-            else:
-                logger.error(f"❌ Welcome failed: {r.text}")
-        except Exception as e:
-            logger.error(f"Welcome error: {e}")
+        welcome = f"<b>🎉 Welcome {name}!</b> 🥳\n\nGlad to have you here. Type /help to see what I can do!"
+        send_message(chat_id, welcome)
