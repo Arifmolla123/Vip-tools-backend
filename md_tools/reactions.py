@@ -6,7 +6,7 @@ from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = "8193376363:AAFyMyVmK7gr4H1ZxZOobwFt_wzeFwJrM"  # নতুন টোকেন বসান
+BOT_TOKEN = "8193376363:AAFyMyVmK7gr4Ft_wzeFwJrM"  # নতুন টোকেন বসান
 
 MONGO_URI = "mongodb+srv://Cyber_md_bot:cybermd123@cluster0.tre505e.mongodb.net/?appName=Cluster0"
 client = MongoClient(MONGO_URI)
