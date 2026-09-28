@@ -9,7 +9,7 @@ logging.getLogger('pymongo').setLevel(logging.ERROR)
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 
 # ========== Bot Configuration ==========
-BOT_TOKEN = "8193376363:AAHs2y2S6rjAAiLqyM-CD2ZoWo-MtrxuW4k"
+BOT_TOKEN = "8193376363:AAHoT05JuVipHJP5kenVUfPkjEWho-7EFTo"
 BOT_LINK = "https://t.me/Arif1222_bot"
 DASHBOARD_BASE = "https://vip-tools-backend.onrender.com"
 
