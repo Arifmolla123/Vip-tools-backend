@@ -2,7 +2,7 @@ import requests
 import logging
 
 logger = logging.getLogger(__name__)
-BOT_TOKEN = "8193376363:AAFyMyVmK7gryI4H1ZxZOobwFt_wzeFwJrM"
+BOT_TOKEN = "8193376363:AAHoT05JuVipHJP5kenVUfPkjEWho-7EFTo"
 
 def handle_commands(msg):
     text = msg.get('text', '')
