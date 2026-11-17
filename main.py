@@ -14,7 +14,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 app.socketio = socketio
 
 # ========== বাকি ব্লুপ্রিন্ট ==========
-files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot', 'random_route', 'ai_chat']
+files = ['hard_bomber', 'cyber_phis', 'cyber_spy', 'support', 'md_bot', 'ai_chat']
 for file in files:
     try:
         module = importlib.import_module(file)
@@ -26,7 +26,7 @@ for file in files:
 
 @app.route('/')
 def home():
-    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support', '/bot', '/random']}
+    return {'status': 'online', 'tools': ['/hard_bomber', '/phis', '/spy', '/support', '/bot']}
 
 @app.route('/ping')
 def ping():
